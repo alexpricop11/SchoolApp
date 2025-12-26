@@ -22,12 +22,15 @@ class School(Base):
     name: Mapped[str] = mapped_column(nullable=False, index=True)
     location: Mapped[str] = mapped_column(nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(nullable=True)
-    email: Mapped[Optional[str]] = mapped_column(nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(nullable=True, index=True, unique=True)
+    established_year: Mapped[Optional[int]] = mapped_column(nullable=True)
+    website: Mapped[Optional[str]] = mapped_column(nullable=True)
+    logo_url: Mapped[Optional[str]] = mapped_column(nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         default=datetime.utcnow, onupdate=datetime.utcnow
     )
-
-    users: Mapped[List["User"]] = relationship("User", back_populates="school")
-    classes: Mapped[List["Class"]] = relationship("Class", back_populates="school")
+    classes = relationship("Class", back_populates="school", cascade="all, delete-orphan")
+    users = relationship("User", back_populates="school")

@@ -27,3 +27,4 @@ async def login(
         auth_service: AuthService = Depends(get_auth_service)
 ):
     return await auth_service.login(data)
+

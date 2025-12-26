@@ -40,18 +40,13 @@ class User(Base):
     reset_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     reset_code_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     school_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("schools.id"), nullable=True
-    )
-    class_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("classes.id"), nullable=True
+        ForeignKey("schools.id", ondelete="SET NULL"), nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     school: Mapped[Optional["School"]] = relationship("School", back_populates="users")
-    class_: Mapped[Optional["Class"]] = relationship("Class", back_populates="students",
-                                                     overlaps="homeroom,headed_classes")
 
     teacher: Mapped[Optional["Teacher"]] = relationship(
         "Teacher",
@@ -62,7 +57,11 @@ class User(Base):
     )
 
     student: Mapped[Optional["Student"]] = relationship(
-        "Student", back_populates="user", uselist=False
+        "Student",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     def set_password(self, plain_password: str):

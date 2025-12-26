@@ -11,7 +11,7 @@ from sqlalchemy.sql.sqltypes import String
 from config.database import Base
 
 if TYPE_CHECKING:
-    from app.users.models import User, Teacher
+    from app.users.models import User, Teacher, Student
     from app.school.models import School
 
 
@@ -27,8 +27,9 @@ class Class(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    students: Mapped[List["User"]] = relationship("User", back_populates="class_", overlaps="homeroom,headed_classes")
     school: Mapped["School"] = relationship("School", back_populates="classes")
 
     teacher_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("teachers.user_id"), nullable=True)
-    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="classes")
+    teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="classes", foreign_keys=[teacher_id])
+
+    students: Mapped[list["Student"]] = relationship("Student", back_populates="class_")

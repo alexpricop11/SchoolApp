@@ -48,13 +48,11 @@ class UserRepository:
         user = result.scalars().first()
         if not user:
             return None
+
         user.username = data.username
         user.email = data.email
         user.role = data.role
         user.school_id = data.school_id
-        user.class_id = data.class_id
-        if data.password:
-            user.set_password(data.password)
         await self.session.commit()
         await self.session.refresh(user)
         return UserRead.model_validate(user)

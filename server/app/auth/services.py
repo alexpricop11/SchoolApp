@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 
 from app.auth.schemas import EmailCheckResponse, AccountStatus, UserLoginRequest, AuthResponse
 from app.password.utils import pwd_context
-from config.security import create_access_token
+from config.security import create_access_token, create_refresh_token
 
 
 class AuthService:
@@ -43,9 +43,13 @@ class AuthService:
 
             password_hash = pwd_context.hash(data.password)
             await self.repository.activate_user(user, password_hash)
-            token = create_access_token({
+            access_token = create_access_token({
                 "sub": str(user.id),
                 "role": user.role
+            })
+
+            refresh_token = create_refresh_token({
+                "sub": str(user.id)
             })
 
             return AuthResponse(
@@ -54,7 +58,8 @@ class AuthService:
                 email=user.email,
                 role=user.role,
                 is_activated=True,
-                access_token=token
+                access_token=access_token,
+                refresh_token=refresh_token,
             )
 
         if not data.password or not pwd_context.verify(data.password, user.password):
@@ -63,15 +68,21 @@ class AuthService:
                 detail="Incorrect password"
             )
 
-        token = create_access_token({
+        access_token = create_access_token({
             "sub": str(user.id),
             "role": user.role
         })
+
+        refresh_token = create_refresh_token({
+            "sub": str(user.id)
+        })
+
         return AuthResponse(
             id=user.id,
             username=user.username,
             email=user.email,
             role=user.role,
             is_activated=True,
-            access_token=token
+            access_token=access_token,
+            refresh_token=refresh_token
         )

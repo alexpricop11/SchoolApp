@@ -7,9 +7,8 @@ from app.users.schemas.user_base import UserRead
 
 
 class StudentBase(BaseModel):
-    id: Optional[uuid.UUID]
     user_id: uuid.UUID
-    parent_id: Optional[uuid.UUID]
+    class_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True
@@ -18,7 +17,6 @@ class StudentBase(BaseModel):
 class StudentCreate(BaseModel):
     username: str
     email: EmailStr
-    parent_id: Optional[uuid.UUID] = None
     class_id: uuid.UUID
     school_id: uuid.UUID
 
@@ -27,10 +25,9 @@ class StudentUpdate(StudentCreate):
     pass
 
 
-class StudentRead(BaseModel):
+class StudentRead(StudentBase):
     user_id: uuid.UUID
     user: Optional[UserRead]
-    parent_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
 

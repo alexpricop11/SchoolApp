@@ -1,30 +1,26 @@
+from pydantic import BaseModel, EmailStr, HttpUrl
+from typing import Optional, List
+import uuid
 from datetime import datetime
 
-from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr
-import uuid
 
-
-# Schema de bază
 class SchoolBase(BaseModel):
-    name: str = Field(..., min_length=3)
-    location: str = Field(..., min_length=3)
-    phone: Optional[str] = Field(None, min_length=9)
-    email: Optional[EmailStr] = None
+    name: str
+    location: str
+    phone: Optional[str]
+    email: Optional[EmailStr]
+    website: Optional[HttpUrl]
+    logo_url: Optional[HttpUrl]
+    established_year: Optional[int]
+    is_active: Optional[bool] = True
 
 
 class SchoolCreate(SchoolBase):
     pass
 
 
-class SchoolUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=3)
-    location: Optional[str] = Field(None, min_length=3)
-    phone: Optional[str] = Field(None, min_length=9)
-    email: Optional[EmailStr] = None
-
-    class Config:
-        from_attributes = True
+class SchoolUpdate(SchoolBase):
+    pass
 
 
 class SchoolRead(SchoolBase):
@@ -32,5 +28,6 @@ class SchoolRead(SchoolBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }

@@ -24,12 +24,25 @@ class TeacherRepository:
         teachers = result.scalars().all()
         return [TeacherRead.model_validate(teacher) for teacher in teachers]
 
+    async def get_by_user_id(self, user_id: uuid.UUID):
+        return await self.session.scalar(
+            select(Teacher).where(Teacher.user_id == user_id)
+        )
+
     async def get_by_id(self, id: uuid.UUID) -> TeacherRead | None:
-        result = await self.session.execute(select(Teacher).where(Teacher.user_id == id))
+        result = await self.session.execute(
+            select(Teacher)
+            .options(
+                selectinload(Teacher.user),
+                selectinload(Teacher.classes),
+            )
+            .where(Teacher.user_id == id)
+        )
         teacher = result.scalars().first()
         return TeacherRead.model_validate(teacher) if teacher else None
 
     async def create(self, teacher_create: TeacherCreate) -> TeacherRead:
+
         async with self.session.begin():
             user = User(
                 id=uuid.uuid4(),
@@ -63,33 +76,29 @@ class TeacherRepository:
         return TeacherRead.model_validate(teacher)
 
     async def update(self, id: uuid.UUID, data: TeacherUpdate) -> TeacherRead | None:
-        async with self.session.begin():
-            result = await self.session.execute(
-                select(Teacher)
-                .options(
-                    selectinload(Teacher.user),
-                    selectinload(Teacher.classes),
-                )
-                .where(Teacher.user_id == id)
-            )
-            teacher = result.scalars().first()
-            if not teacher:
-                return None
+        result = await self.session.execute(
+            select(Teacher)
+            .options(selectinload(Teacher.user), selectinload(Teacher.classes))
+            .where(Teacher.user_id == id)
+        )
+        teacher = result.scalars().first()
+        if not teacher:
+            return None
 
-            if data.subject is not None:
-                teacher.subject = data.subject
-            if data.is_director is not None:
-                teacher.is_director = data.is_director
-            if data.is_homeroom is not None:
-                teacher.is_homeroom = data.is_homeroom
-            if hasattr(data, "username") and data.username:
-                teacher.user.username = data.username
-            if hasattr(data, "email") and data.email:
-                teacher.user.email = str(data.email)
+        if data.subject is not None:
+            teacher.subject = data.subject
+        if data.is_director is not None:
+            teacher.is_director = data.is_director
+        if data.is_homeroom is not None:
+            teacher.is_homeroom = data.is_homeroom
+        if hasattr(data, "username") and data.username:
+            teacher.user.username = data.username
+        if hasattr(data, "email") and data.email:
+            teacher.user.email = str(data.email)
 
-            await self.session.flush()
-
+        await self.session.flush()
         await self.session.refresh(teacher)
+
         return TeacherRead.model_validate(teacher)
 
     async def delete(self, id: uuid.UUID) -> bool:

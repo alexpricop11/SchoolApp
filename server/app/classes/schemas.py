@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class ClassBase(BaseModel):
     name: str
     school_id: UUID
+    model_config = {"from_attributes": True}
 
 
 class ClassCreate(ClassBase):

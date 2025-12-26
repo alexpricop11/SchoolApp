@@ -26,7 +26,6 @@ class StudentService:
         return student
 
     async def create_student(self, student_create: StudentCreate) -> StudentRead:
-
         return await self.repository.create(student_create)
 
     async def delete_student(self, student_id: uuid.UUID) -> None:

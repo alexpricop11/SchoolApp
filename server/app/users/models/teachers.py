@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,6 +26,9 @@ class Teacher(Base):
 
     is_homeroom: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=False)
     is_director: Mapped[bool] = mapped_column(Boolean(), default=False, nullable=False)
+    class_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("classes.id", ondelete="SET NULL"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
@@ -35,6 +38,6 @@ class Teacher(Base):
     )
 
     classes: Mapped[list["Class"]] = relationship(
-        "Class", back_populates="teacher", cascade="all, delete-orphan"
+        "Class", back_populates="teacher", foreign_keys="Class.teacher_id"
     )
     user: Mapped["User"] = relationship("User", back_populates="teacher", uselist=False)

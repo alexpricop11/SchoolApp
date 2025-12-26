@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +13,9 @@ class ClassService:
     async def create_class(db: AsyncSession, data: ClassCreate) -> Class:
         new_class = Class(
             name=data.name,
-            school_id=data.school_id
+            school_id=data.school_id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         return await ClassRepository.create(db, new_class)
 

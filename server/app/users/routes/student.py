@@ -6,7 +6,7 @@ from app.users.repositories import StudentRepository
 from app.users.schemas.student import StudentRead, StudentCreate
 from app.users.services import StudentService
 from config.database import AsyncSession, get_db
-from config.dependences import get_current_user
+from config.dependences import get_current_user, admin_required
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -16,7 +16,7 @@ async def get_student_service(session: AsyncSession = Depends(get_db)) -> Studen
     return StudentService(repository)
 
 
-@router.get("/", response_model=List[StudentRead])
+@router.get("/", response_model=List[StudentRead], dependencies=[Depends(admin_required)])
 async def get_all_students(service: StudentService = Depends(get_student_service)):
     return await service.get_all_students()
 
@@ -39,14 +39,14 @@ async def get_student_by_id(student_id: uuid.UUID, service: StudentService = Dep
     return await service.get_student_by_id(student_id)
 
 
-@router.post("/", response_model=StudentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=StudentRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_required)])
 async def create_student(
         student_data: StudentCreate, service: StudentService = Depends(get_student_service)
 ):
     return await service.create_student(student_data)
 
 
-@router.put("/{student_id}", response_model=StudentRead)
+@router.put("/{student_id}", response_model=StudentRead, dependencies=[Depends(admin_required)])
 async def update_student(
         student_id: uuid.UUID,
         student_data: StudentCreate,
@@ -55,7 +55,7 @@ async def update_student(
     return await service.update_student(student_id, student_data)
 
 
-@router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{student_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_required)])
 async def delete_student(
         student_id: uuid.UUID, service: StudentService = Depends(get_student_service)
 ):

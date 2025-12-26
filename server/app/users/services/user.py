@@ -21,6 +21,14 @@ class UserService:
             )
         return user
 
+    async def check_email_exists(self, email: str) -> None:
+        existing_user = await self.repository.get_by_email(email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"User with email '{email}' already exists"
+            )
+
     async def create_user(self, user_create: UserCreate) -> UserRead:
         existing_user = await self.repository.get_by_email(str(user_create.email))
         if existing_user:
@@ -31,6 +39,7 @@ class UserService:
         return await self.repository.create(user_create)
 
     async def update_user(self, user_id: uuid.UUID, user_data: UserCreate) -> UserRead:
+        await self.check_email_exists(str(user_data.email))
         updated_user = await self.repository.update(user_id, user_data)
         if not updated_user:
             raise HTTPException(

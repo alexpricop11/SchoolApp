@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
 from config.database import Base, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
-from app.users.models import User, Student, Teacher, Parent
+from app.users.models import User, Student, Teacher
 from app.grade.models import GradeModel, GradeTypes
 from app.school.models import School
 from app.classes.models import Class

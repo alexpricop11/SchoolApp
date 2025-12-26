@@ -13,7 +13,6 @@ class UserBase(BaseModel):
     role: UserRole
     is_activated: bool = False
     school_id: Optional[uuid.UUID] = None
-    class_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True
@@ -25,7 +24,6 @@ class UserCreate(BaseModel):
     role: UserRole
     is_activated: bool = False
     school_id: Optional[uuid.UUID] = None
-    class_id: Optional[uuid.UUID] = None
 
 
 class UserRead(BaseModel):

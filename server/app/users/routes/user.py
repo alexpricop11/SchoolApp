@@ -12,7 +12,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 async def get_user_service(session: AsyncSession = Depends(get_db)) -> UserService:
     repository = UserRepository(session)
-    return UserService(repository, session)
+    return UserService(repository)
 
 
 @router.get("/", response_model=List[UserRead], dependencies=[Depends(admin_required)])
