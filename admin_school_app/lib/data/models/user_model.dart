@@ -6,7 +6,9 @@ class UserModel extends UserEntity {
   final String role;
   final bool isActive;
   final String userId;
+  final bool exists;
   String accessToken;
+  String refreshToken;
 
   UserModel({
     required this.username,
@@ -14,14 +16,18 @@ class UserModel extends UserEntity {
     required this.role,
     required this.isActive,
     required this.userId,
+    required this.exists,
     required this.accessToken,
+    required this.refreshToken,
   }) : super(
          username: username,
          email: email,
          role: role,
          isActive: isActive,
          userId: userId,
+         exists: exists,
          accessToken: accessToken,
+         refreshToken: refreshToken,
        );
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -31,7 +37,9 @@ class UserModel extends UserEntity {
       role: json['role'] ?? '',
       isActive: json['is_active'] ?? false,
       userId: json['userId'] ?? '',
+      exists: json['exists'] ?? false,
       accessToken: json['accessToken'] ?? '',
+      refreshToken: json['refreshToken'] ?? '',
     );
   }
 }

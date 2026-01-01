@@ -29,6 +29,7 @@ import '../../features/auth/data/datasource/password_data_source.dart';
 import '../../features/auth/data/repositories/password_repositories_impl.dart';
 import '../../features/auth/domain/repositories/password_repositories.dart';
 import '../../features/auth/domain/usecases/send_reset_code_usecase.dart';
+
 import '../../features/auth/presentation/controllers/password_controller.dart';
 
 final sl = GetIt.instance;
@@ -64,7 +65,13 @@ Future<void> initDependencies() async {
   // Controller
   sl.registerFactory(() => StudentController(sl<StudentUseCase>()));
 
-  // --- Repository ---
+  // -------------------- AUTH --------------------
+  // DataSource
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSourceImpl(sl<Dio>()),
+  );
+
+  // Repository
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(sl<AuthRemoteDataSource>()),
   );

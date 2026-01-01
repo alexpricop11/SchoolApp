@@ -20,20 +20,24 @@ void main() async {
   Widget initialPage = const WelcomePage();
 
   if (token != null && roleString != null) {
-    final role = UserRoleExtension.fromString(roleString);
-    switch (role) {
-      case UserRole.teacher:
-        initialPage = TeacherPage();
-        break;
-      case UserRole.student:
-        initialPage = StudentHomePage();
-        break;
-      case UserRole.parent:
-        // initialPage = const ParentHomePage();
-        break;
-      case UserRole.director:
-        // initialPage = const DirectorHomePage();
-        break;
+    try {
+      final role = UserRoleExtension.fromString(roleString);
+      switch (role) {
+        case UserRole.teacher:
+          initialPage = TeacherPage();
+          break;
+        case UserRole.student:
+          initialPage = StudentHomePage();
+          break;
+        case UserRole.parent:
+          // initialPage = const ParentHomePage();
+          break;
+        case UserRole.director:
+          // initialPage = const DirectorHomePage();
+          break;
+      }
+    } catch (e) {
+      await SecureStorageService.deleteToken();
     }
   }
 

@@ -7,6 +7,13 @@ from app.classes.routes import router as classes_router
 from app.users.routes.teacher import router as teacher_router
 from app.users.routes.student import router as student_router
 from app.users.routes.user import router as user_router
+from app.dashboard.routes import router as dashboard_router
+from app.grade.routes import router as grade_router
+from app.subject.routes import router as subject_router
+from app.schedule.routes import router as schedule_router
+from app.homework.routes import router as homework_router
+from app.attendance.routes import router as attendance_router
+from app.notification.routes import router as notification_router
 from middleware import setup_cors
 
 app = FastAPI()
@@ -20,6 +27,13 @@ app.include_router(user_router)
 app.include_router(student_router)
 app.include_router(classes_router)
 app.include_router(password_router)
+app.include_router(dashboard_router)
+app.include_router(grade_router)
+app.include_router(subject_router)
+app.include_router(schedule_router)
+app.include_router(homework_router)
+app.include_router(attendance_router)
+app.include_router(notification_router)
 
 
 @app.get("/", response_class=HTMLResponse)

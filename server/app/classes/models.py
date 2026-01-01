@@ -13,6 +13,9 @@ from config.database import Base
 if TYPE_CHECKING:
     from app.users.models import User, Teacher, Student
     from app.school.models import School
+    from app.schedule.models import Schedule
+    from app.homework.models import Homework
+    from app.material.models import Material
 
 
 class Class(Base):
@@ -33,3 +36,8 @@ class Class(Base):
     teacher: Mapped["Teacher"] = relationship("Teacher", back_populates="classes", foreign_keys=[teacher_id])
 
     students: Mapped[list["Student"]] = relationship("Student", back_populates="class_")
+
+    # New relationships
+    schedules: Mapped[List["Schedule"]] = relationship("Schedule", back_populates="class_", cascade="all, delete-orphan")
+    homeworks: Mapped[List["Homework"]] = relationship("Homework", back_populates="class_", cascade="all, delete-orphan")
+    materials: Mapped[List["Material"]] = relationship("Material", back_populates="class_", cascade="all, delete-orphan")

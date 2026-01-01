@@ -12,6 +12,12 @@ from app.grade.models import GradeModel, GradeTypes
 from app.school.models import School
 from app.classes.models import Class
 from app.subject.models import Subject
+from app.schedule.models import Schedule, DayOfWeek
+from app.homework.models import Homework, HomeworkStatus
+from app.attendance.models import Attendance, AttendanceStatus
+from app.notification.models import Notification, NotificationType
+from app.message.models import Message
+from app.material.models import Material
 
 config = context.config
 section = config.config_ini_section

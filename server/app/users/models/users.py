@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 from passlib.context import CryptContext
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -15,6 +15,8 @@ from config.database import Base
 if TYPE_CHECKING:
     from app.users.models import Student, Teacher
     from app.school.models import School
+    from app.notification.models import Notification
+    from app.message.models import Message
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -63,6 +65,11 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
+
+    # New relationships for notifications and messages
+    notifications: Mapped[List["Notification"]] = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    sent_messages: Mapped[List["Message"]] = relationship("Message", foreign_keys="Message.sender_id", back_populates="sender", cascade="all, delete-orphan")
+    received_messages: Mapped[List["Message"]] = relationship("Message", foreign_keys="Message.receiver_id", back_populates="receiver", cascade="all, delete-orphan")
 
     def set_password(self, plain_password: str):
         self.password = pwd_context.hash(plain_password)

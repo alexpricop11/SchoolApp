@@ -6,7 +6,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from config.database import Base
 
 if TYPE_CHECKING:
-    from app.grade.models import Grade
+    from app.grade.models import GradeModel
+    from app.schedule.models import Schedule
+    from app.homework.models import Homework
+    from app.attendance.models import Attendance
+    from app.material.models import Material
 
 
 class Subject(Base):
@@ -17,4 +21,9 @@ class Subject(Base):
     )
     name: Mapped[str] = mapped_column(nullable=False, index=True)
 
-    grades: Mapped[List["Grade"]] = relationship("Grade", back_populates="subject")
+    # Relationships
+    grades: Mapped[List["GradeModel"]] = relationship("GradeModel", back_populates="subject", cascade="all, delete-orphan")
+    schedules: Mapped[List["Schedule"]] = relationship("Schedule", back_populates="subject", cascade="all, delete-orphan")
+    homeworks: Mapped[List["Homework"]] = relationship("Homework", back_populates="subject", cascade="all, delete-orphan")
+    attendances: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="subject", cascade="all, delete-orphan")
+    materials: Mapped[List["Material"]] = relationship("Material", back_populates="subject", cascade="all, delete-orphan")

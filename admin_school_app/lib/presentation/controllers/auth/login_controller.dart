@@ -1,12 +1,11 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../../../../../core/services/secure_storage_service.dart';
 import '../../../../../core/ui/input_decorations.dart' as ui_decorations;
 import '../../../domain/usecases/check_email_usecase.dart';
 import '../../../domain/usecases/login_usecase.dart';
+import '../../pages/dashboard/dashboard_page.dart';
 import 'package:get_it/get_it.dart';
 
 class LoginController extends GetxController {
@@ -14,7 +13,7 @@ class LoginController extends GetxController {
       .get<CheckEmailUseCase>();
   final LoginUseCase loginUseCase = GetIt.instance.get<LoginUseCase>();
 
-  final _emailRegex = RegExp(r'^[\w\.\-]+@([\w\-]+\.)+[a-zA-Z]{2,}$');
+  final _emailRegex = RegExp(r'^[\w.\-]+@([\w\-]+\.)+[a-zA-Z]{2,}$');
 
   var email = ''.obs;
   var password = ''.obs;
@@ -54,13 +53,10 @@ class LoginController extends GetxController {
     );
   }
 
-  // Activation flow state:
-  // 0 = none/initial, 1 = code sent (verify), 2 = verified (set new password)
   var activationStep = 0.obs;
   var activationLoading = false.obs;
   var sentCode = ''.obs;
 
-  // Send a simulated 6-digit activation code to email (dev shows code via snackbar)
   Future<void> sendActivationCode(String emailValue) async {
     final e = emailValue.trim();
     if (e.isEmpty || !_emailRegex.hasMatch(e)) {
@@ -74,7 +70,6 @@ class LoginController extends GetxController {
     sentCode.value = code;
     activationStep.value = 1;
     activationLoading.value = false;
-    // dev: show code
     Get.snackbar(
       'Cod trimis',
       'Cod (dev): $code',
@@ -82,7 +77,6 @@ class LoginController extends GetxController {
     );
   }
 
-  // Verify the activation code locally
   Future<bool> verifyActivationCode(String code) async {
     activationLoading.value = true;
     await Future.delayed(const Duration(milliseconds: 500));
@@ -129,6 +123,10 @@ class LoginController extends GetxController {
       errorMessage.value = 'Emailul nu există!';
       return null;
     }
+    if (user.exists == false) {
+      errorMessage.value = 'Cont-ul nu există!';
+      return null;
+    }
 
     if (user.isActive == true) {
       showPasswordField.value = true;
@@ -164,6 +162,8 @@ class LoginController extends GetxController {
       authResponse.role,
       authResponse.userId,
     );
+
+    Get.offAll(() => const DashboardPage());
   }
 
   void togglePasswordVisibility() {

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -13,6 +13,10 @@ if TYPE_CHECKING:
     from app.grade.models import GradeModel
     from app.users.models import User
     from app.classes.models import Class
+    from app.schedule.models import Schedule
+    from app.homework.models import Homework
+    from app.attendance.models import Attendance
+    from app.material.models import Material
 
 
 class Teacher(Base):
@@ -41,3 +45,10 @@ class Teacher(Base):
         "Class", back_populates="teacher", foreign_keys="Class.teacher_id"
     )
     user: Mapped["User"] = relationship("User", back_populates="teacher", uselist=False)
+
+    # New relationships
+    grades: Mapped[List["GradeModel"]] = relationship("GradeModel", back_populates="teacher", cascade="all, delete-orphan")
+    schedules: Mapped[List["Schedule"]] = relationship("Schedule", back_populates="teacher", cascade="all, delete-orphan")
+    homeworks: Mapped[List["Homework"]] = relationship("Homework", back_populates="teacher", cascade="all, delete-orphan")
+    attendances: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="teacher", cascade="all, delete-orphan")
+    materials: Mapped[List["Material"]] = relationship("Material", back_populates="teacher", cascade="all, delete-orphan")

@@ -45,7 +45,7 @@ class AuthService:
             await self.repository.activate_user(user, password_hash)
             access_token = create_access_token({
                 "sub": str(user.id),
-                "role": user.role
+                "role": user.role.value
             })
 
             refresh_token = create_refresh_token({
@@ -70,7 +70,7 @@ class AuthService:
 
         access_token = create_access_token({
             "sub": str(user.id),
-            "role": user.role
+            "role": user.role.value
         })
 
         refresh_token = create_refresh_token({
