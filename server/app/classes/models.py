@@ -40,4 +40,4 @@ class Class(Base):
     # New relationships
     schedules: Mapped[List["Schedule"]] = relationship("Schedule", back_populates="class_", cascade="all, delete-orphan")
     homeworks: Mapped[List["Homework"]] = relationship("Homework", back_populates="class_", cascade="all, delete-orphan")
-    materials: Mapped[List["Material"]] = relationship("Material", back_populates="class_", cascade="all, delete-orphan")
+    materials: Mapped[List["Material"]] = relationship("app.material.models.Material", back_populates="class_", cascade="all, delete-orphan")

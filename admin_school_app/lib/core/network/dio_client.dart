@@ -1,1 +1,3 @@
-const String baseUrl = 'http://172.22.240.1:8000';
+import '../config/app_config.dart';
+
+String get baseUrl => AppConfig.baseUrl;

@@ -4,7 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
-from app.users.models.users import UserRole
+from app.users.enums import UserRole
 
 
 class EmailCheckRequest(BaseModel):
@@ -52,3 +52,16 @@ class AuthResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None

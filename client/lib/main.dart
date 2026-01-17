@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'core/di/injection.dart';
 import 'core/translation/app_translations.dart';
-import '../../../../core/services/secure_storage_service.dart';
+import 'core/services/secure_storage_service.dart';
+import 'core/services/cache_service.dart';
 import 'features/auth/domain/entities/USER_ROLE.dart';
 import 'features/student/presentation/pages/home_page.dart';
 import 'features/student/presentation/pages/student_home_page.dart';
@@ -11,9 +13,16 @@ import 'welcome_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initDependencies();
+
+  // Initialize services
+  await Future.wait([
+    initDependencies(),
+    CacheService.init(),
+  ]);
 
   final token = await SecureStorageService.getToken();
+  debugPrint("App started, token exists: ${token != null}");
+
   final roleString = await SecureStorageService.getRole();
   // SecureStorageService.deleteToken();
 
@@ -24,16 +33,10 @@ void main() async {
       final role = UserRoleExtension.fromString(roleString);
       switch (role) {
         case UserRole.teacher:
-          initialPage = TeacherPage();
+          initialPage = TeacherDashboardPage();
           break;
         case UserRole.student:
           initialPage = StudentHomePage();
-          break;
-        case UserRole.parent:
-          // initialPage = const ParentHomePage();
-          break;
-        case UserRole.director:
-          // initialPage = const DirectorHomePage();
           break;
       }
     } catch (e) {

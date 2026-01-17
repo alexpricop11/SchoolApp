@@ -5,8 +5,7 @@ from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 
 from .user_base import UserRead
-from ...classes import Class
-from ...classes.schemas import ClassBase
+from ...classes import ClassBase
 
 
 class TeacherBase(BaseModel):

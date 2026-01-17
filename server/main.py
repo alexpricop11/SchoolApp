@@ -3,7 +3,7 @@ import uvicorn
 if __name__ == "__main__":
     uvicorn.run(
         "api:app",
-        host="172.22.240.1",
+        host="10.240.0.129",
         port=8000,
         reload=True
     )

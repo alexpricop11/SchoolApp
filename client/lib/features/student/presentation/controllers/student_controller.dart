@@ -24,7 +24,7 @@ class StudentController extends GetxController {
       isLoading.value = true;
       final list = await useCase.getAll();
       students.value = list;
-    } catch (e, st) {
+    } catch (e) {
       errorMessage.value = e.toString();
     } finally {
       isLoading.value = false;

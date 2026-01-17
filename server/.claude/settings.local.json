@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python seed_database.py:*)",
+      "Bash(python seed_specific_user.py)",
+      "Bash(D:SchoolAppserver.venvScriptspython.exe D:SchoolAppservermain.py)",
+      "Bash(.venv/Scripts/python.exe:*)"
+    ]
+  }
+}

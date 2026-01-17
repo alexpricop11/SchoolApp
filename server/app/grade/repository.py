@@ -1,6 +1,6 @@
 import uuid
-from typing import List, Optional
-from sqlalchemy import select
+from typing import List, Optional, Tuple
+from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 
 from app.grade.models import GradeModel
@@ -27,38 +27,70 @@ class GradeRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_all(self) -> List[GradeModel]:
-        result = await self.session.execute(
-            select(GradeModel).options(joinedload(GradeModel.subject))
-        )
-        return list(result.scalars().all())
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+        # Get total count
+        count_result = await self.session.execute(select(func.count(GradeModel.id)))
+        total = count_result.scalar()
 
-    async def get_by_student(self, student_id: uuid.UUID) -> List[GradeModel]:
+        # Get paginated results
+        result = await self.session.execute(
+            select(GradeModel)
+            .options(joinedload(GradeModel.subject))
+            .order_by(GradeModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), total
+
+    async def get_by_student(self, student_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+        # Get total count
+        count_result = await self.session.execute(
+            select(func.count(GradeModel.id)).where(GradeModel.student_id == student_id)
+        )
+        total = count_result.scalar()
+
+        # Get paginated results
         result = await self.session.execute(
             select(GradeModel)
             .options(joinedload(GradeModel.subject))
             .where(GradeModel.student_id == student_id)
             .order_by(GradeModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
-    async def get_by_teacher(self, teacher_id: uuid.UUID) -> List[GradeModel]:
+    async def get_by_teacher(self, teacher_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+        count_result = await self.session.execute(
+            select(func.count(GradeModel.id)).where(GradeModel.teacher_id == teacher_id)
+        )
+        total = count_result.scalar()
+
         result = await self.session.execute(
             select(GradeModel)
             .options(joinedload(GradeModel.subject))
             .where(GradeModel.teacher_id == teacher_id)
             .order_by(GradeModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
-    async def get_by_subject(self, subject_id: uuid.UUID) -> List[GradeModel]:
+    async def get_by_subject(self, subject_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+        count_result = await self.session.execute(
+            select(func.count(GradeModel.id)).where(GradeModel.subject_id == subject_id)
+        )
+        total = count_result.scalar()
+
         result = await self.session.execute(
             select(GradeModel)
             .options(joinedload(GradeModel.subject))
             .where(GradeModel.subject_id == subject_id)
             .order_by(GradeModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
-        return list(result.scalars().all())
+        return list(result.scalars().all()), total
 
     async def update(self, grade_id: uuid.UUID, grade_data: GradeUpdate) -> Optional[GradeModel]:
         grade = await self.get_by_id(grade_id)

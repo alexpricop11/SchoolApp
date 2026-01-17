@@ -1,61 +1,266 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../data/datasource/student_data_api.dart';
+import '../../data/model/homework_model.dart';
 
-class HomeworkPage extends StatelessWidget {
+class HomeworkPage extends StatefulWidget {
   const HomeworkPage({super.key});
 
-  final List<Map<String, String>> homeworks = const [
-    {"subject": "Matematică", "task": "Tema 5"},
-    {"subject": "Română", "task": "Eseu"},
-    {"subject": "Engleză", "task": "Pagina 42-45"},
-  ];
+  @override
+  State<HomeworkPage> createState() => _HomeworkPageState();
+}
+
+class _HomeworkPageState extends State<HomeworkPage> {
+  StudentDataApi? _api;
+  List<HomeworkModel> _homeworks = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHomework();
+  }
+
+  Future<void> _loadHomework() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (_api == null) {
+        final dio = await DioClient.getInstance();
+        _api = StudentDataApi(dio);
+      }
+
+      final student = await _api!.getMe();
+      if (student == null || student.classId.isEmpty) {
+        setState(() {
+          _errorMessage = 'Nu s-a putut obține clasa studentului';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final homeworks = await _api!.getClassHomework(student.classId);
+      setState(() {
+        _homeworks = homeworks;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Eroare la încărcarea temelor: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return Colors.green;
+      case 'overdue':
+        return Colors.red;
+      case 'pending':
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'Completată';
+      case 'overdue':
+        return 'Întârziată';
+      case 'pending':
+      default:
+        return 'În așteptare';
+    }
+  }
+
+  String _formatDueDate(DateTime dueDate) {
+    final now = DateTime.now();
+    final difference = dueDate.difference(now);
+
+    if (difference.isNegative) {
+      return 'Expirat ${DateFormat('dd MMM yyyy').format(dueDate)}';
+    } else if (difference.inDays == 0) {
+      return 'Azi până la ${DateFormat('HH:mm').format(dueDate)}';
+    } else if (difference.inDays == 1) {
+      return 'Mâine până la ${DateFormat('HH:mm').format(dueDate)}';
+    } else {
+      return 'Termen: ${DateFormat('dd MMM yyyy').format(dueDate)}';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('homework_page_title'.tr)),
-      backgroundColor: const Color(0xFF121212),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: homeworks.length,
-        itemBuilder: (context, index) {
-          final hw = homeworks[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1C20),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                )
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(hw["subject"]!,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(hw["task"]!,
-                        style: const TextStyle(color: Colors.white70)),
-                  ],
-                ),
-                const Icon(Icons.chevron_right, color: Colors.white54),
-              ],
-            ),
-          );
-        },
+      appBar: AppBar(
+        title: Text('homework_page_title'.tr),
+        backgroundColor: const Color(0xFF0F172A),
       ),
+      backgroundColor: const Color(0xFF0B0B0D),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.white70, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadHomework,
+                        child: const Text('Reîncearcă'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadHomework,
+                  child: _homeworks.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.assignment, size: 64, color: Colors.white24),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Nu există teme pentru moment',
+                                style: const TextStyle(color: Colors.white70, fontSize: 18),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _homeworks.length,
+                          itemBuilder: (context, index) {
+                            final homework = _homeworks[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF1A1C20), Color(0xFF111827)],
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _getStatusColor(homework.status).withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            homework.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: _getStatusColor(homework.status).withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _getStatusColor(homework.status),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _getStatusText(homework.status),
+                                            style: TextStyle(
+                                              color: _getStatusColor(homework.status),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.book, size: 16, color: Colors.blue),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          homework.subjectName,
+                                          style: const TextStyle(
+                                            color: Colors.blue,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (homework.description != null && homework.description!.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        homework.description!,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 12),
+                                    const Divider(color: Colors.white10, height: 1),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 16,
+                                          color: homework.status == 'overdue' ? Colors.red : Colors.white60,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _formatDueDate(homework.dueDate),
+                                          style: TextStyle(
+                                            color: homework.status == 'overdue' ? Colors.red : Colors.white60,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
     );
   }
 }

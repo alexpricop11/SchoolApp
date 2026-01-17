@@ -1,10 +1,18 @@
+from datetime import datetime, timezone
 from app.auth.repository import AuthRepository
 from pydantic import EmailStr
 from fastapi import HTTPException, status
 
-from app.auth.schemas import EmailCheckResponse, AccountStatus, UserLoginRequest, AuthResponse
+from app.auth.schemas import (
+    EmailCheckResponse, AccountStatus, UserLoginRequest, AuthResponse,
+    RefreshTokenRequest, RefreshTokenResponse
+)
 from app.password.utils import pwd_context
-from config.security import create_access_token, create_refresh_token
+from config.security import (
+    create_access_token, create_refresh_token,
+    verify_refresh_token, get_token_expiry
+)
+from config.token_blacklist import blacklist_token, is_token_blacklisted
 
 
 class AuthService:
@@ -86,3 +94,64 @@ class AuthService:
             access_token=access_token,
             refresh_token=refresh_token
         )
+
+    async def refresh_token(self, data: RefreshTokenRequest) -> RefreshTokenResponse:
+        """Generate new access and refresh tokens using a valid refresh token."""
+        # Check if token is blacklisted
+        if is_token_blacklisted(data.refresh_token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked"
+            )
+
+        # Verify the refresh token
+        is_valid, payload = verify_refresh_token(data.refresh_token)
+        if not is_valid or not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token"
+            )
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload"
+            )
+
+        # Blacklist the old refresh token (token rotation)
+        expiry = get_token_expiry(data.refresh_token)
+        if expiry:
+            blacklist_token(data.refresh_token, expiry)
+
+        # Get user to include role in new access token
+        # For simplicity, we'll use the user_id from the token
+        # In production, you might want to fetch the user to get the current role
+        new_access_token = create_access_token({
+            "sub": user_id,
+            "role": payload.get("role", "student")  # Default to student if role not in refresh token
+        })
+
+        new_refresh_token = create_refresh_token({
+            "sub": user_id
+        })
+
+        return RefreshTokenResponse(
+            access_token=new_access_token,
+            refresh_token=new_refresh_token
+        )
+
+    async def logout(self, access_token: str, refresh_token: str = None) -> dict:
+        """Logout user by blacklisting their tokens."""
+        # Blacklist the access token
+        expiry = get_token_expiry(access_token)
+        if expiry:
+            blacklist_token(access_token, expiry)
+
+        # Blacklist the refresh token if provided
+        if refresh_token:
+            refresh_expiry = get_token_expiry(refresh_token)
+            if refresh_expiry:
+                blacklist_token(refresh_token, refresh_expiry)
+
+        return {"message": "Successfully logged out"}

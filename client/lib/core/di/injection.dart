@@ -22,14 +22,18 @@ import '../../features/student/presentation/controllers/student_controller.dart'
 import '../../features/teacher/data/datasource/teacher_remote_data_source.dart';
 import '../../features/teacher/data/repositories/teacher_repository_impl.dart';
 import '../../features/teacher/domain/repositories/teacher_repository.dart';
-import '../../features/teacher/domain/usecases/teacher_usecases.dart';
-import '../../features/teacher/presentation/controllers/teacher_controller.dart';
-import '../network/dio_client.dart';
+import '../../features/teacher/domain/usecases/get_current_teacher.dart';
+import '../../features/teacher/data/datasource/grade_remote_data_source.dart';
+import '../../features/teacher/data/datasource/homework_remote_data_source.dart';
+import '../../features/teacher/data/datasource/attendance_remote_data_source.dart';
+import '../../features/teacher/data/datasource/schedule_remote_data_source.dart';
+import '../../features/teacher/data/datasource/material_remote_data_source.dart';
+import '../../features/teacher/presentation/controllers/teacher_dashboard_controller.dart';
+import '../config/app_config.dart';
 import '../../features/auth/data/datasource/password_data_source.dart';
 import '../../features/auth/data/repositories/password_repositories_impl.dart';
 import '../../features/auth/domain/repositories/password_repositories.dart';
 import '../../features/auth/domain/usecases/send_reset_code_usecase.dart';
-
 import '../../features/auth/presentation/controllers/password_controller.dart';
 
 final sl = GetIt.instance;
@@ -38,18 +42,14 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<Dio>(
     () => Dio(
       BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
+        baseUrl: AppConfig.baseUrl,
+        connectTimeout: AppConfig.connectTimeout,
+        receiveTimeout: AppConfig.receiveTimeout,
         headers: {'Content-Type': 'application/json'},
       ),
     ),
   );
 
-  // --- Remote DataSource ---
-  // -------------------- STUDENTS --------------------
-
-  // DataSource
   sl.registerLazySingleton<StudentRemoteDataSource>(
     () => StudentRemoteDataSourceImpl(sl<Dio>()),
   );
@@ -144,23 +144,30 @@ Future<void> initDependencies() async {
 
   // UseCases
   sl.registerLazySingleton(
-    () => GetAllTeachersUseCase(sl<TeacherRepository>()),
+    () => GetCurrentTeacherUseCase(sl<TeacherRepository>()),
   );
-  sl.registerLazySingleton(
-    () => GetTeacherByIdUseCase(sl<TeacherRepository>()),
-  );
-  sl.registerLazySingleton(() => CreateTeacherUseCase(sl<TeacherRepository>()));
-  sl.registerLazySingleton(() => UpdateTeacherUseCase(sl<TeacherRepository>()));
-  sl.registerLazySingleton(() => DeleteTeacherUseCase(sl<TeacherRepository>()));
 
-  // Controller
-  sl.registerFactory(
-    () => TeacherController(
-      getAllTeachersUseCase: sl<GetAllTeachersUseCase>(),
-      getTeacherByIdUseCase: sl<GetTeacherByIdUseCase>(),
-      createTeacherUseCase: sl<CreateTeacherUseCase>(),
-      updateTeacherUseCase: sl<UpdateTeacherUseCase>(),
-      deleteTeacherUseCase: sl<DeleteTeacherUseCase>(),
-    ),
+  // Teacher Data Sources
+  sl.registerLazySingleton<GradeRemoteDataSource>(
+    () => GradeRemoteDataSourceImpl(dio: sl<Dio>()),
   );
+
+  sl.registerLazySingleton<HomeworkRemoteDataSource>(
+    () => HomeworkRemoteDataSourceImpl(dio: sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<AttendanceRemoteDataSource>(
+    () => AttendanceRemoteDataSourceImpl(dio: sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<ScheduleRemoteDataSource>(
+    () => ScheduleRemoteDataSourceImpl(dio: sl<Dio>()),
+  );
+
+  sl.registerLazySingleton<MaterialRemoteDataSource>(
+    () => MaterialRemoteDataSourceImpl(dio: sl<Dio>()),
+  );
+
+  // Teacher Controller
+  sl.registerFactory(() => TeacherDashboardController());
 }

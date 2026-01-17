@@ -1,12 +1,13 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.grade.repository import GradeRepository
 from app.grade.schemas import GradeCreate, GradeRead, GradeUpdate
 from app.grade.service import GradeService
 from config.database import AsyncSession, get_db
 from config.dependences import get_current_user, admin_required
+from config.pagination import PaginationParams
 
 router = APIRouter(prefix="/grades", tags=["Grades"])
 
@@ -26,50 +27,65 @@ async def create_grade(
     return await service.create_grade(grade_data)
 
 
-@router.get("/", response_model=List[GradeRead], dependencies=[Depends(admin_required)])
-async def get_all_grades(service: GradeService = Depends(get_grade_service)):
-    """Get all grades (Admin only)"""
-    return await service.get_all_grades()
+@router.get("/", dependencies=[Depends(admin_required)])
+async def get_all_grades(
+    pagination: PaginationParams = Depends(),
+    service: GradeService = Depends(get_grade_service)
+):
+    """Get all grades with pagination (Admin only)"""
+    return await service.get_all_grades(pagination.skip, pagination.limit)
 
 
 @router.get("/my-grades", response_model=List[GradeRead])
 async def get_my_grades(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
     service: GradeService = Depends(get_grade_service)
 ):
-    """Get grades for the current student"""
+    """Get grades for the current student with pagination"""
     user_id = uuid.UUID(current_user["id"])
-    return await service.get_student_grades(user_id)
+    items, total = await service.get_student_grades(user_id, skip, limit)
+    return items  # Return items directly for backward compatibility
 
 
 @router.get("/student/{student_id}", response_model=List[GradeRead])
 async def get_student_grades(
     student_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
     service: GradeService = Depends(get_grade_service)
 ):
-    """Get grades for a specific student"""
-    return await service.get_student_grades(student_id)
+    """Get grades for a specific student with pagination"""
+    items, total = await service.get_student_grades(student_id, skip, limit)
+    return items
 
 
 @router.get("/teacher/{teacher_id}", response_model=List[GradeRead])
 async def get_teacher_grades(
     teacher_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
     service: GradeService = Depends(get_grade_service)
 ):
-    """Get all grades given by a specific teacher"""
-    return await service.get_teacher_grades(teacher_id)
+    """Get all grades given by a specific teacher with pagination"""
+    items, total = await service.get_teacher_grades(teacher_id, skip, limit)
+    return items
 
 
 @router.get("/subject/{subject_id}", response_model=List[GradeRead])
 async def get_subject_grades(
     subject_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
     current_user: dict = Depends(get_current_user),
     service: GradeService = Depends(get_grade_service)
 ):
-    """Get all grades for a specific subject"""
-    return await service.get_subject_grades(subject_id)
+    """Get all grades for a specific subject with pagination"""
+    items, total = await service.get_subject_grades(subject_id, skip, limit)
+    return items
 
 
 @router.get("/{grade_id}", response_model=GradeRead)

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'home_page.dart';
-import 'inbox_page.dart';
 import 'profile_page.dart';
 
 class StudentHomePage extends StatefulWidget {
@@ -14,11 +13,7 @@ class StudentHomePage extends StatefulWidget {
 class _StudentHomePage extends State<StudentHomePage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    HomePage(),
-    InboxPage(),
-    ProfilePage(),
-  ];
+  final List<Widget> _pages = [HomePage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {
@@ -31,10 +26,6 @@ class _StudentHomePage extends State<StudentHomePage> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.home),
             label: 'home'.tr,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.inbox),
-            label: 'inbox'.tr,
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.person),

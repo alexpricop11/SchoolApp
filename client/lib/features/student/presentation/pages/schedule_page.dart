@@ -14,7 +14,7 @@ class SchedulePage extends StatefulWidget {
 }
 
 class _SchedulePageState extends State<SchedulePage> {
-  late StudentDataApi _api;
+  StudentDataApi? _api;
   List<ScheduleModel> _schedules = [];
   bool _isLoading = true;
   int _selectedDay = DateTime.now().weekday - 1;
@@ -25,15 +25,24 @@ class _SchedulePageState extends State<SchedulePage> {
   @override
   void initState() {
     super.initState();
-    _api = StudentDataApi(Dio(BaseOptions(baseUrl: baseUrl)));
     _loadSchedule();
   }
 
   Future<void> _loadSchedule() async {
     setState(() => _isLoading = true);
-    // In realitate, ar trebui să obținem class_id din student data
-    final classId = 'class-id-placeholder'; // TODO: Get from student data
-    final schedules = await _api.getClassSchedule(classId);
+
+    if (_api == null) {
+      final dio = await DioClient.getInstance();
+      _api = StudentDataApi(dio);
+    }
+
+    final student = await _api!.getMe();
+    if (student == null || student.classId.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final schedules = await _api!.getClassSchedule(student.classId);
     setState(() {
       _schedules = schedules;
       _isLoading = false;

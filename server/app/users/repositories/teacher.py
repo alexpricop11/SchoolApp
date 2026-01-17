@@ -4,7 +4,8 @@ from datetime import datetime
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.users.models import Teacher, User, UserRole
+from app.users.models import Teacher, User
+from app.users.enums import UserRole
 from app.users.schemas.teacher import TeacherCreate, TeacherRead, TeacherUpdate
 from config.database import AsyncSession
 

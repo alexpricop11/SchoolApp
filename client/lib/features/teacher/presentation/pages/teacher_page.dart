@@ -1,67 +1,52 @@
-import 'package:SchoolApp/features/teacher/presentation/widgets/custom_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_it/get_it.dart';
-import '../models/teacher_models.dart';
-import '../widgets/dashboard_body.dart';
-import 'all_class_page.dart';
-import 'class_page.dart';
-import 'package:SchoolApp/features/teacher/presentation/controllers/teacher_controller.dart';
+import '../controllers/teacher_dashboard_controller.dart';
+import '../widgets/home_tab_final.dart';
+import '../widgets/profile_tab.dart';
 
-class TeacherPage extends StatelessWidget {
-  const TeacherPage({super.key});
+class TeacherDashboardPage extends StatelessWidget {
+  const TeacherDashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = GetIt.instance.get<TeacherController>();
+    final controller = Get.put(TeacherDashboardController());
 
-    return SafeArea(
-      top: false,
-      child: Scaffold(
-        appBar: CustomAppBar(),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
-            ),
-            Expanded(
-              child: DashboardBody(
-                lessons: mockLessonsToday,
-                onLessonTap: (lesson) {
-                  Get.to(
-                    () => ClassPage(
-                      className: lesson.schoolClass.name,
-                      subject: lesson.schoolClass.subject,
-                      totalStudents: lesson.schoolClass.students.length,
-                      onStartLesson: () {
-                        Get.snackbar(
-                          'Lecție',
-                          'S-a început lecția pentru ${lesson.schoolClass.name}',
-                          snackPosition: SnackPosition.BOTTOM,
-                        );
-                      },
-                    ),
-                  );
-                },
-                onAllClassesPressed: () {
-                  Get.to(() => AllClassesPage(classes: mockClasses));
-                },
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.inbox), label: 'Inbox'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          ],
-        ),
-      ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F1419),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.blueAccent),
+          );
+        }
+
+        final List<Widget> pages = [
+          HomeTabFinal(controller: controller),
+          ProfileTab(controller: controller),
+        ];
+
+        return pages[controller.currentIndex.value];
+      }),
+      bottomNavigationBar: Obx(() => BottomNavigationBar(
+        currentIndex: controller.currentIndex.value,
+        onTap: (index) => controller.currentIndex.value = index,
+        backgroundColor: const Color(0xFF1A1F26),
+        selectedItemColor: Colors.blueAccent,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        selectedFontSize: 14,
+        unselectedFontSize: 12,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded, size: 28),
+            label: 'Acasă',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_rounded, size: 28),
+            label: 'Profil',
+          ),
+        ],
+      )),
     );
   }
 }

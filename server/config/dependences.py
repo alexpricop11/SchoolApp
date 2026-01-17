@@ -1,26 +1,52 @@
+import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
+
 from config.security import SECRET_KEY, ALGORITHM
+from config.token_blacklist import is_token_blacklisted
 
-http_bearer_scheme = HTTPBearer()
+logger = logging.getLogger(__name__)
+http_bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(http_bearer_scheme)
-):
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(http_bearer_scheme)):
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No authorization credentials provided"
+        )
+
+    token = credentials.credentials
+
+    # Check if token is blacklisted
+    if is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked"
+        )
+
     try:
-        token = credentials.credentials
-
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
 
+        if not user_id or not role:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+            )
         return {"id": user_id, "role": role}
-    except JWTError:
+    except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            detail="Token expired",
+        )
+    except JWTError as e:
+        logger.warning(f"JWT validation failed: {type(e).__name__}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
         )
 
 

@@ -1,22 +1,27 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../data/datasource/student_data_api.dart';
+import '../../data/model/schedule_model.dart';
+import '../widgets/buildSmallCard.dart';
 import 'homework_page.dart';
 import 'notes_page.dart';
 import 'schedule_page.dart';
-import 'inbox_page.dart';
-import 'profile_page.dart'; // added import for navigation to profile
 
-class HomePage extends StatelessWidget {
-  HomePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  StudentDataApi? _api;
+  ScheduleModel? _nextLesson;
+  bool _isLoadingSchedule = true;
+  String _nextLessonTime = '';
 
   final List<Map<String, dynamic>> cards = const [
-    {
-      "titleKey": "next_lesson_title",
-      "icon": Icons.schedule,
-      "color": Color(0xFFFFA500),
-      "page": null,
-    },
     {
       "titleKey": "homework_card",
       "icon": Icons.assignment,
@@ -37,31 +42,105 @@ class HomePage extends StatelessWidget {
     },
   ];
 
-  final List<String> notificationsKeys = const [
-    "notif_math_added",
-    "notif_event_created",
-    "notif_english_hw",
-    "notif_parents_meeting",
-    "notif_physics_added",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadNextLesson();
+  }
+
+  Future<void> _loadNextLesson() async {
+    setState(() => _isLoadingSchedule = true);
+
+    try {
+      if (_api == null) {
+        final dio = await DioClient.getInstance();
+        _api = StudentDataApi(dio);
+      }
+
+      final student = await _api!.getMe();
+      if (student != null && student.classId.isNotEmpty) {
+        final schedules = await _api!.getClassSchedule(student.classId!);
+
+        final now = DateTime.now();
+        final currentDay = _getDayName(now.weekday);
+
+        final todaySchedules =
+            schedules
+                .where(
+                  (s) => s.dayOfWeek.toLowerCase() == currentDay.toLowerCase(),
+                )
+                .toList()
+              ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+
+        if (todaySchedules.isNotEmpty) {
+          for (var schedule in todaySchedules) {
+            final lessonTime = _parseTime(schedule.startTime);
+            if (lessonTime.isAfter(now)) {
+              setState(() {
+                _nextLesson = schedule;
+                _nextLessonTime = _calculateTimeUntil(lessonTime);
+                _isLoadingSchedule = false;
+              });
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading next lesson: $e');
+    }
+
+    setState(() => _isLoadingSchedule = false);
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1:
+        return 'monday';
+      case 2:
+        return 'tuesday';
+      case 3:
+        return 'wednesday';
+      case 4:
+        return 'thursday';
+      case 5:
+        return 'friday';
+      case 6:
+        return 'saturday';
+      case 7:
+        return 'sunday';
+      default:
+        return 'monday';
+    }
+  }
+
+  DateTime _parseTime(String timeString) {
+    final parts = timeString.split(':');
+    final now = DateTime.now();
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+  }
+
+  String _calculateTimeUntil(DateTime lessonTime) {
+    final now = DateTime.now();
+    final difference = lessonTime.difference(now);
+
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ${difference.inMinutes % 60}m';
+    } else {
+      return '${difference.inDays}d';
+    }
+  }
 
   Future<void> _handleRefresh() async {
-    try {
-      final ctrl = Get.find<dynamic>();
-      try {
-        await ctrl.refresh();
-        return;
-      } catch (_) {}
-      try {
-        await ctrl.reload();
-        return;
-      } catch (_) {}
-      try {
-        await ctrl.fetchStudent();
-        return;
-      } catch (_) {}
-    } catch (_) {}
-    await Future.delayed(const Duration(seconds: 1));
+    await _loadNextLesson();
   }
 
   @override
@@ -100,29 +179,9 @@ class HomePage extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      // tappable avatar -> open ProfilePage
-                      Material(
-                        elevation: 6,
-                        shape: const CircleBorder(),
-                        color: Colors.transparent,
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => Get.to(() => ProfilePage()),
-                          child: CircleAvatar(
-                            radius: 30,
-                            backgroundColor: const Color(0xFF1F2937),
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
                               'home'.tr,
@@ -135,29 +194,12 @@ class HomePage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {
-                          Get.to(() => InboxPage());
-                        },
-                        icon: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF111827),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                          child: const Icon(
-                            Icons.mail_outline,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
 
                 GestureDetector(
-                  onTap: () {},
+                  onTap: () => Get.to(() => const SchedulePage()),
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -179,169 +221,126 @@ class HomePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.schedule,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'next_lesson_title'.tr,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                    child: _isLoadingSchedule
+                        ? const Center(
+                            child: SizedBox(
+                              height: 80,
+                              child: Center(
+                                child: CircularProgressIndicator(
                                   color: Colors.white,
+                                  strokeWidth: 2,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'next_lesson_details'.tr,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 14,
+                            ),
+                          )
+                        : Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.schedule,
+                                  color: Colors.white,
+                                  size: 28,
                                 ),
                               ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade700,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'In 12m',
-                                      style: TextStyle(
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _nextLesson != null
+                                          ? 'next_lesson_title'.tr
+                                          : 'Nu există ore astăzi',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
                                         color: Colors.white,
-                                        fontSize: 12,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _nextLesson != null
+                                          ? '${_nextLesson!.subjectName} - ${_nextLesson!.startTime}'
+                                          : 'Relaxează-te!',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    if (_nextLesson != null) ...[
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.shade700,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              _nextLessonTime.isNotEmpty
+                                                  ? 'În $_nextLessonTime'
+                                                  : 'În curând',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          if (_nextLesson!.room != null) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade700,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                'Sala ${_nextLesson!.room}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
 
                 Column(
-                  children: List.generate(cards.length - 1, (index) {
-                    final card = cards[index + 1];
+                  children: List.generate(cards.length, (index) {
+                    final card = cards[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildSmallCard(context, card),
+                      child: buildSmallCard(context, card),
                     );
                   }),
                 ),
                 const SizedBox(height: 8),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSmallCard(BuildContext context, Map<String, dynamic> card) {
-    return Material(
-      elevation: 6,
-      borderRadius: BorderRadius.circular(16),
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          if (card["page"] != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => card["page"]),
-            );
-          }
-        },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.02),
-                Colors.white.withOpacity(0.01),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.03)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: (card["color"] as Color).withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(card["icon"], color: card["color"], size: 26),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (card["titleKey"] as String).tr,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'tap_to_open'.tr,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: 13,
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right,
-                              color: Colors.white70,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ),

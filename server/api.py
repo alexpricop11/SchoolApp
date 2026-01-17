@@ -1,25 +1,37 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+
+from app.attendance.routes import router as attendance_router
 from app.auth.routes import router as auth_router
-from app.school.routes import router as school_router
-from app.password.routes import router as password_router
 from app.classes.routes import router as classes_router
-from app.users.routes.teacher import router as teacher_router
-from app.users.routes.student import router as student_router
-from app.users.routes.user import router as user_router
+from app.classes.schemas import ClassBase
 from app.dashboard.routes import router as dashboard_router
 from app.grade.routes import router as grade_router
-from app.subject.routes import router as subject_router
-from app.schedule.routes import router as schedule_router
 from app.homework.routes import router as homework_router
-from app.attendance.routes import router as attendance_router
+from app.material.routes import router as material_router
 from app.notification.routes import router as notification_router
+from app.password.routes import router as password_router
+from app.schedule.routes import router as schedule_router
+from app.school.routes import router as school_router
+from app.subject.routes import router as subject_router
+from app.users.routes.student import router as student_router
+from app.users.routes.teacher import router as teacher_router
+from app.users.routes.user import router as user_router
+from app.users.schemas import TeacherRead, StudentRead
+from app.websocket.routes import router as websocket_router
 from middleware import setup_cors
 
-app = FastAPI()
+app = FastAPI(
+    title="School App API",
+    description="Backend API for School Management Application",
+    version="1.0.0"
+)
+
+ClassBase.model_rebuild(_types_namespace={"TeacherRead": TeacherRead, "StudentRead": StudentRead})
 
 setup_cors(app)
 
+# API Routes
 app.include_router(auth_router)
 app.include_router(school_router)
 app.include_router(teacher_router)
@@ -34,6 +46,10 @@ app.include_router(schedule_router)
 app.include_router(homework_router)
 app.include_router(attendance_router)
 app.include_router(notification_router)
+app.include_router(material_router)
+
+# WebSocket Routes
+app.include_router(websocket_router)
 
 
 @app.get("/", response_class=HTMLResponse)

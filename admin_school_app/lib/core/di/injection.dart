@@ -6,7 +6,7 @@ import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/check_email_usecase.dart';
 import '../../domain/usecases/login_usecase.dart';
-import '../network/dio_client.dart';
+import '../config/app_config.dart';
 import '../network/auth_interceptor.dart';
 
 // Schools
@@ -73,9 +73,9 @@ Future<void> initDependencies() async {
     () {
       final dio = Dio(
         BaseOptions(
-          baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 5),
+          baseUrl: AppConfig.baseUrl,
+          connectTimeout: AppConfig.connectTimeout,
+          receiveTimeout: AppConfig.receiveTimeout,
           headers: {'Content-Type': 'application/json'},
         ),
       );

@@ -177,17 +177,8 @@ class LoginController extends GetxController {
         case UserRole.student:
           Get.offAll(() => StudentHomePage());
           break;
-        case UserRole.parent:
-          Get.snackbar('Info', 'Pagina părinților nu este implementată încă.');
-          break;
-        case UserRole.director:
-          Get.snackbar(
-            'Info',
-            'Pagina directorului nu este implementată încă.',
-          );
-          break;
         case UserRole.teacher:
-          throw UnimplementedError();
+          Get.offAll(()=> TeacherDashboardPage());
       }
     } catch (e) {
       Get.snackbar('Eroare', 'Rol necunoscut!');

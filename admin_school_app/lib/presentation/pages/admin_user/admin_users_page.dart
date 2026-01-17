@@ -10,6 +10,7 @@ class AdminUsersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(AdminUsersController());
+    final isMobile = MediaQuery.of(context).size.width < 800;
 
     return MainLayout(
       currentPage: 'users',
@@ -40,264 +41,41 @@ class AdminUsersPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(isMobile),
           Expanded(
             child: Obx(() {
               if (controller.isLoading.value) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFEC4899), Color(0xFFDB2777)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Se încarcă utilizatorii...',
-                        style: TextStyle(color: Colors.white54, fontSize: 16),
-                      ),
-                    ],
-                  ),
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
                 );
               }
 
               if (controller.errorMessage.isNotEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.red.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 48,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        controller.errorMessage.value,
-                        style: const TextStyle(color: Colors.red, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: controller.loadUsers,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reîncearcă'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEC4899),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildError(controller);
               }
 
               if (controller.users.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1F3A),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: Color(0xFFEC4899),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Nu există utilizatori',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Apasă butonul + pentru a adăuga primul utilizator',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildEmptyState();
               }
 
               return RefreshIndicator(
                 onRefresh: controller.loadUsers,
                 backgroundColor: const Color(0xFF1A1F3A),
                 color: const Color(0xFFEC4899),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1F3A),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: MaterialStateProperty.all(
-                          const Color(0xFFEC4899).withOpacity(0.15),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: isMobile
+                      ? ListView.builder(
+                          itemCount: controller.users.length,
+                          itemBuilder: (context, index) {
+                            final user = controller.users[index];
+                            return _buildMobileCard(controller, user);
+                          },
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: _buildDataTable(controller),
                         ),
-                        headingRowHeight: 60,
-                        dataRowHeight: 65,
-                        headingTextStyle: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        dataTextStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('ID')),
-                          DataColumn(label: Text('Username')),
-                          DataColumn(label: Text('Email')),
-                          DataColumn(label: Text('Rol')),
-                          DataColumn(label: Text('School ID')),
-                          DataColumn(label: Text('Activat')),
-                          DataColumn(label: Text('Acțiuni')),
-                        ],
-                        rows: controller.users.map((user) {
-                          return DataRow(
-                            cells: [
-                              DataCell(Text(user.id?.toString().substring(0, 8) ?? '-')),
-                              DataCell(Text(user.username)),
-                              DataCell(Text(user.email)),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF3B82F6),
-                                        Color(0xFF2563EB),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    user.role.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(Text(user.schoolId?.substring(0, 8) ?? '-')),
-                              DataCell(
-                                Icon(
-                                  user.isActivated
-                                      ? Icons.check_circle
-                                      : Icons.cancel,
-                                  color: user.isActivated
-                                      ? Colors.green
-                                      : Colors.red,
-                                  size: 20,
-                                ),
-                              ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFFEC4899),
-                                              Color(0xFFDB2777),
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.edit,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      onPressed: () => Get.to(
-                                        () =>
-                                            AdminUserFormPage(userId: user.id),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      onPressed: () => _showDeleteDialog(
-                                        controller,
-                                        user.id!,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
                 ),
               );
             }),
@@ -307,9 +85,12 @@ class AdminUsersPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: 24,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF0A0E1A),
         border: Border(
@@ -350,6 +131,235 @@ class AdminUsersPage extends StatelessWidget {
                 style: TextStyle(color: Colors.white54, fontSize: 14),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCard(AdminUsersController controller, user) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: const Color(0xFF1A1F3A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              user.username,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ID: ${user.id?.substring(0, 8) ?? "-"}',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            Text(
+              'Email: ${user.email ?? "-"}',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            Text(
+              'Rol: ${user.role.toUpperCase()}',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            Text(
+              'School ID: ${user.schoolId?.substring(0, 8) ?? "-"}',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            Row(
+              children: [
+                Text(
+                  'Activat: ',
+                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                ),
+                Icon(
+                  user.isActivated ? Icons.check_circle : Icons.cancel,
+                  color: user.isActivated ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        Get.to(() => AdminUserFormPage(userId: user.id)),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Editează'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEC4899),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showDeleteDialog(controller, user.id!),
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: const Text('Șterge'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataTable(AdminUsersController controller) {
+    return DataTable(
+      headingRowColor: MaterialStateProperty.all(
+        const Color(0xFFEC4899).withOpacity(0.15),
+      ),
+      headingRowHeight: 60,
+      dataRowHeight: 65,
+      headingTextStyle: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 14,
+      ),
+      dataTextStyle: TextStyle(
+        color: Colors.white.withOpacity(0.8),
+        fontSize: 14,
+      ),
+      columns: const [
+        DataColumn(label: Text('ID')),
+        DataColumn(label: Text('Username')),
+        DataColumn(label: Text('Email')),
+        DataColumn(label: Text('Rol')),
+        DataColumn(label: Text('School ID')),
+        DataColumn(label: Text('Activat')),
+        DataColumn(label: Text('Acțiuni')),
+      ],
+      rows: controller.users.map((user) {
+        return DataRow(
+          cells: [
+            DataCell(Text(user.id?.substring(0, 8) ?? '-')),
+            DataCell(Text(user.username)),
+            DataCell(Text(user.email)),
+            DataCell(Text(user.role.toUpperCase())),
+            DataCell(Text(user.schoolId?.substring(0, 8) ?? '-')),
+            DataCell(
+              Icon(
+                user.isActivated ? Icons.check_circle : Icons.cancel,
+                color: user.isActivated ? Colors.green : Colors.red,
+                size: 20,
+              ),
+            ),
+            DataCell(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Colors.white),
+                    onPressed: () =>
+                        Get.to(() => AdminUserFormPage(userId: user.id)),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _showDeleteDialog(controller, user.id!),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1F3A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: const Icon(
+              Icons.people_outline,
+              size: 64,
+              color: Color(0xFFEC4899),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Nu există utilizatori',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Apasă butonul + pentru a adăuga primul utilizator',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(AdminUsersController controller) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            controller.errorMessage.value,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: controller.loadUsers,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reîncearcă'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEC4899),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),

@@ -13,7 +13,7 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  late StudentDataApi _api;
+  StudentDataApi? _api;
   List<GradeModel> _grades = [];
   bool _isLoading = true;
   Map<String, List<GradeModel>> _gradesBySubject = {};
@@ -22,13 +22,18 @@ class _NotesPageState extends State<NotesPage> {
   @override
   void initState() {
     super.initState();
-    _api = StudentDataApi(Dio(BaseOptions(baseUrl: baseUrl)));
     _loadGrades();
   }
 
   Future<void> _loadGrades() async {
     setState(() => _isLoading = true);
-    final grades = await _api.getMyGrades();
+
+    if (_api == null) {
+      final dio = await DioClient.getInstance();
+      _api = StudentDataApi(dio);
+    }
+
+    final grades = await _api!.getMyGrades();
     setState(() {
       _grades = grades;
       _isLoading = false;
@@ -217,7 +222,7 @@ class _NotesPageState extends State<NotesPage> {
                               ],
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                     ),
             ),

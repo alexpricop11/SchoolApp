@@ -1,7 +1,7 @@
 from sqlalchemy.future import select
 
 from app.users.models import User
-from app.users.models.users import UserRole
+from app.users.enums import UserRole
 from config.database import AsyncSession
 from pydantic import EmailStr
 

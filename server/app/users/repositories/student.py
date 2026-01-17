@@ -7,7 +7,8 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from app.users.models import Student, User, UserRole
+from app.users.models import Student, User
+from app.users.enums import UserRole
 from app.users.schemas.student import StudentCreate, StudentRead
 from config.database import AsyncSession
 

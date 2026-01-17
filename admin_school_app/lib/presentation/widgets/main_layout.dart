@@ -1,3 +1,4 @@
+import 'package:admin_school_app/presentation/pages/settings/settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -26,6 +27,8 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   Future<void> _handleLogout() async {
     await SecureStorageService.deleteToken();
     Get.offAll(() => const LoginPage());
@@ -33,100 +36,158 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  bottomLeft: Radius.circular(30),
-                ),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.05),
-                  width: 1,
-                ),
+    final isMobile = MediaQuery.of(context).size.width < 800;
+
+    return SafeArea(
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: const Color(0xFF0A0E1A),
+        drawer: isMobile ? Drawer(child: _buildSidebarContent()) : null,
+        body: Row(
+          children: [
+            if (!isMobile) SizedBox(width: 280, child: _buildSidebarContent()),
+            Expanded(
+              child: Column(
+                children: [
+                  if (isMobile) _buildMobileHeader(),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: !isMobile
+                            ? const BorderRadius.only(
+                                topLeft: Radius.circular(30),
+                                bottomLeft: Radius.circular(30),
+                              )
+                            : null,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.05),
+                          width: 1,
+                        ),
+                      ),
+                      child: widget.child,
+                    ),
+                  ),
+                ],
               ),
-              child: widget.child,
+            ),
+          ],
+        ),
+        floatingActionButton: widget.floatingActionButton,
+      ),
+    );
+  }
+
+  Widget _buildMobileHeader() {
+    return Container(
+      color: const Color(0xFF0A0E1A),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            icon: const Icon(Icons.menu, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'Dashboard',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
       ),
-      floatingActionButton: widget.floatingActionButton,
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebarContent() {
     return Container(
-      width: 280,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF1A1F3A),
-            const Color(0xFF0A0E1A),
-          ],
+          colors: [Color(0xFF1A1F3A), Color(0xFF0A0E1A)],
         ),
       ),
       child: Column(
         children: [
-          _buildSidebarHeader(),
           const SizedBox(height: 32),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 _buildMenuItem(
-                  icon: Icons.dashboard_rounded,
-                  title: 'Dashboard',
-                  gradient: [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
-                  isActive: widget.currentPage == 'dashboard',
-                  onTap: () => Get.off(() => const DashboardPage()),
+                  Icons.dashboard_rounded,
+                  'Dashboard',
+                  [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+                  widget.currentPage == 'dashboard',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const DashboardPage());
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildMenuItem(
-                  icon: Icons.school_rounded,
-                  title: 'Școli',
-                  gradient: [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
-                  isActive: widget.currentPage == 'schools',
-                  onTap: () => Get.off(() => const SchoolsPage()),
+                  Icons.school_rounded,
+                  'Școli',
+                  [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+                  widget.currentPage == 'schools',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const SchoolsPage());
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildMenuItem(
-                  icon: Icons.class_rounded,
-                  title: 'Clase',
-                  gradient: [const Color(0xFF10B981), const Color(0xFF059669)],
-                  isActive: widget.currentPage == 'classes',
-                  onTap: () => Get.off(() => const ClassesPage()),
+                  Icons.class_rounded,
+                  'Clase',
+                  [const Color(0xFF10B981), const Color(0xFF059669)],
+                  widget.currentPage == 'classes',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const ClassesPage());
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildMenuItem(
-                  icon: Icons.person_rounded,
-                  title: 'Profesori',
-                  gradient: [const Color(0xFFF59E0B), const Color(0xFFD97706)],
-                  isActive: widget.currentPage == 'teachers',
-                  onTap: () => Get.off(() => const TeachersPage()),
+                  Icons.person_rounded,
+                  'Profesori',
+                  [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+                  widget.currentPage == 'teachers',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const TeachersPage());
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildMenuItem(
-                  icon: Icons.people_rounded,
-                  title: 'Elevi',
-                  gradient: [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
-                  isActive: widget.currentPage == 'students',
-                  onTap: () => Get.off(() => const StudentsPage()),
+                  Icons.people_rounded,
+                  'Elevi',
+                  [const Color(0xFF8B5CF6), const Color(0xFF7C3AED)],
+                  widget.currentPage == 'students',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const StudentsPage());
+                  },
                 ),
                 const SizedBox(height: 8),
                 _buildMenuItem(
-                  icon: Icons.manage_accounts_rounded,
-                  title: 'Utilizatori',
-                  gradient: [const Color(0xFFEC4899), const Color(0xFFDB2777)],
-                  isActive: widget.currentPage == 'users',
-                  onTap: () => Get.off(() => const AdminUsersPage()),
+                  Icons.manage_accounts_rounded,
+                  'Utilizatori',
+                  [const Color(0xFFEC4899), const Color(0xFFDB2777)],
+                  widget.currentPage == 'users',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800)
+                      Navigator.pop(context);
+                    Get.off(() => const AdminUsersPage());
+                  },
                 ),
               ],
             ),
@@ -139,82 +200,45 @@ class _MainLayoutState extends State<MainLayout> {
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: _buildMenuItem(
-              icon: Icons.logout_rounded,
-              title: 'Deconectare',
-              gradient: [const Color(0xFFEF4444), const Color(0xFFDC2626)],
-              isActive: false,
-              onTap: _handleLogout,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF6366F1),
-                  Color(0xFF8B5CF6),
-                  Color(0xFFEC4899),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6366F1).withOpacity(0.4),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+            child: Column(
+              children: [
+                _buildMenuItem(
+                  Icons.settings,
+                  'Setari',
+                  [const Color(0xFF4B5563), const Color(0xFF374151)],
+                  widget.currentPage == 'settings',
+                  () {
+                    if (MediaQuery.of(context).size.width < 800) {
+                      Navigator.pop(context);
+                    }
+                    Get.off(() => const SettingsPage());
+                  },
                 ),
+                _buildMenuItem(
+                  Icons.logout_rounded,
+                  'Deconectare',
+                  [const Color(0xFFEF4444), const Color(0xFFDC2626)],
+                  false,
+                  _handleLogout,
+                ),
+                const SizedBox(height: 8),
               ],
             ),
-            child: const Icon(
-              Icons.admin_panel_settings,
-              color: Colors.white,
-              size: 40,
-            ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Admin Panel',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Sistem Management',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required List<Color> gradient,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
+
+  Widget _buildMenuItem(
+    IconData icon,
+    String title,
+    List<Color> gradient,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -223,13 +247,12 @@ class _MainLayoutState extends State<MainLayout> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: isActive ? Colors.white.withOpacity(0.08) : Colors.transparent,
+            color: isActive
+                ? Colors.white.withOpacity(0.08)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             border: isActive
-                ? Border.all(
-                    color: gradient[0].withOpacity(0.3),
-                    width: 1,
-                  )
+                ? Border.all(color: gradient[0].withOpacity(0.3), width: 1)
                 : null,
           ),
           child: Row(
@@ -258,7 +281,9 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
                 child: Icon(
                   icon,
-                  color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+                  color: isActive
+                      ? Colors.white
+                      : Colors.white.withOpacity(0.5),
                   size: 20,
                 ),
               ),
@@ -267,7 +292,9 @@ class _MainLayoutState extends State<MainLayout> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
+                    color: isActive
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.6),
                     fontSize: 15,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                   ),

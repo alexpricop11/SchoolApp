@@ -10,6 +10,7 @@ class SchoolsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(SchoolsController());
+    final isMobile = MediaQuery.of(context).size.width < 800;
 
     return MainLayout(
       currentPage: 'schools',
@@ -40,227 +41,38 @@ class SchoolsPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(isMobile),
           Expanded(
             child: Obx(() {
               if (controller.isLoading.value) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Se încarcă școlile...',
-                        style: TextStyle(color: Colors.white54, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                );
+                return const Center(child: CircularProgressIndicator(color: Colors.white));
               }
 
               if (controller.errorMessage.isNotEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.red.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 48,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        controller.errorMessage.value,
-                        style: const TextStyle(color: Colors.red, fontSize: 16),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: controller.loadSchools,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reîncearcă'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3B82F6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildError(controller);
               }
 
               if (controller.schools.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1F3A),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.school_outlined,
-                          size: 64,
-                          color: Color(0xFF3B82F6),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Nu există școli',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Apasă butonul + pentru a adăuga prima școală',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                return _buildEmptyState();
               }
 
               return RefreshIndicator(
                 onRefresh: controller.loadSchools,
                 backgroundColor: const Color(0xFF1A1F3A),
                 color: const Color(0xFF3B82F6),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1F3A),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.05)),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: MaterialStateProperty.all(
-                          const Color(0xFF3B82F6).withOpacity(0.15),
-                        ),
-                        headingRowHeight: 60,
-                        dataRowHeight: 65,
-                        headingTextStyle: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        dataTextStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('ID')),
-                          DataColumn(label: Text('Nume')),
-                          DataColumn(label: Text('Adresă')),
-                          DataColumn(label: Text('Telefon')),
-                          DataColumn(label: Text('Email')),
-                          DataColumn(label: Text('Acțiuni')),
-                        ],
-                        rows: controller.schools.map((school) {
-                          return DataRow(
-                            cells: [
-                              DataCell(Text(school.id?.toString() ?? '-')),
-                              DataCell(Text(school.name)),
-                              DataCell(Text(school.location ?? '-')),
-                              DataCell(Text(school.phone ?? '-')),
-                              DataCell(Text(school.email ?? '-')),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              Color(0xFF3B82F6),
-                                              Color(0xFF2563EB),
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.edit,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      onPressed: () => Get.to(
-                                        () =>
-                                            SchoolFormPage(schoolId: school.id),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      onPressed: () => _showDeleteDialog(
-                                        controller,
-                                        school.id!,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: isMobile
+                      ? ListView.builder(
+                    itemCount: controller.schools.length,
+                    itemBuilder: (context, index) {
+                      final school = controller.schools[index];
+                      return _buildMobileCard(controller, school);
+                    },
+                  )
+                      : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _buildDataTable(controller),
                   ),
                 ),
               );
@@ -271,9 +83,9 @@ class SchoolsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32, vertical: 24),
       decoration: BoxDecoration(
         color: const Color(0xFF0A0E1A),
         border: Border(
@@ -320,6 +132,180 @@ class SchoolsPage extends StatelessWidget {
     );
   }
 
+  Widget _buildMobileCard(SchoolsController controller, school) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: const Color(0xFF1A1F3A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              school.name,
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('ID: ${school.id ?? "-"}', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+            Text('Adresă: ${school.location ?? "-"}', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+            Text('Telefon: ${school.phone ?? "-"}', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+            Text('Email: ${school.email ?? "-"}', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => Get.to(() => SchoolFormPage(schoolId: school.id)),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('Editează'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showDeleteDialog(controller, school.id!),
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: const Text('Șterge'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataTable(SchoolsController controller) {
+    return DataTable(
+      headingRowColor: WidgetStateProperty.all(const Color(0xFF3B82F6).withOpacity(0.15)),
+      headingRowHeight: 60,
+      headingTextStyle: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.bold,
+        fontSize: 14,
+      ),
+      dataTextStyle: TextStyle(
+        color: Colors.white.withOpacity(0.8),
+        fontSize: 14,
+      ),
+      columns: const [
+        DataColumn(label: Text('ID')),
+        DataColumn(label: Text('Nume')),
+        DataColumn(label: Text('Adresă')),
+        DataColumn(label: Text('Telefon')),
+        DataColumn(label: Text('Email')),
+        DataColumn(label: Text('Acțiuni')),
+      ],
+      rows: controller.schools.map((school) {
+        return DataRow(cells: [
+          DataCell(Text(school.id?.toString() ?? '-')),
+          DataCell(Text(school.name)),
+          DataCell(Text(school.location ?? '-')),
+          DataCell(Text(school.phone ?? '-')),
+          DataCell(Text(school.email ?? '-')),
+          DataCell(Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.white),
+                onPressed: () => Get.to(() => SchoolFormPage(schoolId: school.id)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _showDeleteDialog(controller, school.id!),
+              ),
+            ],
+          )),
+        ]);
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1F3A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: const Icon(
+              Icons.school_outlined,
+              size: 64,
+              color: Color(0xFF3B82F6),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Nu există școli',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Apasă butonul + pentru a adăuga prima școală',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(SchoolsController controller) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            controller.errorMessage.value,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: controller.loadSchools,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reîncearcă'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showDeleteDialog(SchoolsController controller, String schoolId) {
     Get.dialog(
       Dialog(
@@ -349,20 +335,13 @@ class SchoolsPage extends StatelessWidget {
               const SizedBox(height: 24),
               const Text(
                 'Confirmare Ștergere',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               Text(
                 'Sigur doriți să ștergeți această școală?\nAceastă acțiune nu poate fi anulată.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
               ),
               const SizedBox(height: 24),
               Row(
@@ -373,14 +352,9 @@ class SchoolsPage extends StatelessWidget {
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: Colors.white.withOpacity(0.1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'Anulează',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child: const Text('Anulează', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -393,14 +367,9 @@ class SchoolsPage extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text(
-                        'Șterge',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child: const Text('Șterge', style: TextStyle(color: Colors.white)),
                     ),
                   ),
                 ],
