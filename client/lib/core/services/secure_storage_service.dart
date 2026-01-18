@@ -7,6 +7,7 @@ class SecureStorageService {
   static const _refreshTokenKey = 'refresh_token';
   static const _roleKey = 'user_role';
   static const _userIdKey = 'user_id';
+  static const _languageKey = 'app_language';
 
   // --- Save tokens ---
   static Future<void> saveToken(String token, String role, String userId) async {
@@ -17,6 +18,15 @@ class SecureStorageService {
 
   static Future<void> saveRefreshToken(String refreshToken) async {
     await _storage.write(key: _refreshTokenKey, value: refreshToken);
+  }
+
+  // --- Save / Read language ---
+  static Future<void> saveLanguage(String languageCode) async {
+    await _storage.write(key: _languageKey, value: languageCode);
+  }
+
+  static Future<String?> getLanguage() async {
+    return await _storage.read(key: _languageKey);
   }
 
   // --- Read tokens ---

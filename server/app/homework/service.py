@@ -42,3 +42,9 @@ class HomeworkService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Homework with id {homework_id} not found"
             )
+
+    async def bulk_create_homework(self, homeworks: List[HomeworkCreate]) -> List[Homework]:
+        created = []
+        for h in homeworks:
+            created.append(await self.repository.create(h))
+        return created

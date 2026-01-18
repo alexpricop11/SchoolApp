@@ -36,6 +36,15 @@ class ScheduleRepository:
         )
         return list(result.scalars().all())
 
+    async def get_by_teacher(self, teacher_id: uuid.UUID) -> List[Schedule]:
+        result = await self.session.execute(
+            select(Schedule)
+            .options(joinedload(Schedule.subject), joinedload(Schedule.class_))
+            .where(Schedule.teacher_id == teacher_id)
+            .order_by(Schedule.day_of_week, Schedule.period_number)
+        )
+        return list(result.scalars().all())
+
     async def update(self, schedule_id: uuid.UUID, schedule_data: ScheduleUpdate) -> Optional[Schedule]:
         schedule = await self.get_by_id(schedule_id)
         if not schedule:

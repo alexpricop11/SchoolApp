@@ -18,6 +18,7 @@ class Schedule extends Equatable {
   final String endTime; // Format: "HH:mm"
   final String? room;
   final String classId;
+  final String? className;
   final String subjectId;
   final String? subjectName;
   final String teacherId;
@@ -31,6 +32,7 @@ class Schedule extends Equatable {
     required this.endTime,
     this.room,
     required this.classId,
+    this.className,
     required this.subjectId,
     this.subjectName,
     required this.teacherId,
@@ -46,6 +48,7 @@ class Schedule extends Equatable {
         endTime,
         room,
         classId,
+        className,
         subjectId,
         subjectName,
         teacherId,

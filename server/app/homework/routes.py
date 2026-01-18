@@ -25,6 +25,15 @@ async def create_homework(
     return await service.create_homework(homework_data)
 
 
+@router.post('/bulk', response_model=List[HomeworkRead], status_code=status.HTTP_201_CREATED)
+async def create_homework_bulk(
+    homeworks: List[HomeworkCreate],
+    current_user: dict = Depends(get_current_user),
+    service: HomeworkService = Depends(get_homework_service)
+):
+    return await service.bulk_create_homework(homeworks)
+
+
 @router.get("/class/{class_id}", response_model=List[HomeworkRead])
 async def get_class_homework(
     class_id: uuid.UUID,

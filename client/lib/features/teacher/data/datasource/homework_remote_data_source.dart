@@ -7,6 +7,7 @@ abstract class HomeworkRemoteDataSource {
   Future<HomeworkModel> createHomework(Map<String, dynamic> homeworkData, String token);
   Future<HomeworkModel> updateHomework(String homeworkId, Map<String, dynamic> homeworkData, String token);
   Future<void> deleteHomework(String homeworkId, String token);
+  Future<List<HomeworkModel>> createHomeworkBulk(List<Map<String, dynamic>> homeworkList, String token);
 }
 
 class HomeworkRemoteDataSourceImpl implements HomeworkRemoteDataSource {
@@ -49,5 +50,15 @@ class HomeworkRemoteDataSourceImpl implements HomeworkRemoteDataSource {
       '/homework/$homeworkId',
       options: AuthOptions.bearer(token),
     );
+  }
+
+  @override
+  Future<List<HomeworkModel>> createHomeworkBulk(List<Map<String, dynamic>> homeworkList, String token) async {
+    final response = await dio.post(
+      '/homework/bulk',
+      data: homeworkList,
+      options: AuthOptions.bearer(token),
+    );
+    return (response.data as List).map((json) => HomeworkModel.fromJson(json)).toList();
   }
 }

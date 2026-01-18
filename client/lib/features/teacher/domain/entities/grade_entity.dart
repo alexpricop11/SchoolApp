@@ -1,12 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum GradeType {
-  exam,
-  test,
-  homework,
-  assignment,
-  other,
-}
+enum GradeType { exam, test, homework, assignment, other }
 
 class Grade extends Equatable {
   final String id;

@@ -9,6 +9,7 @@ class TeacherModel extends Teacher {
     required super.id,
     required super.username,
     required super.email,
+    super.avatarUrl,
     super.subject,
     super.isHomeroom,
     super.isDirector,
@@ -20,6 +21,7 @@ class TeacherModel extends Teacher {
       id: json['user_id'] ?? '',
       username: json['user']?['username'] ?? '',
       email: json['user']?['email'] ?? '',
+      avatarUrl: json['user']?['avatar_url'],
       subject: json['subject'],
       isHomeroom: json['is_homeroom'] ?? false,
       isDirector: json['is_director'] ?? false,
@@ -35,6 +37,7 @@ class TeacherModel extends Teacher {
     return {
       'username': username,
       'email': email,
+      'avatar_url': avatarUrl,
       'subject': subject,
       'is_homeroom': isHomeroom,
       'is_director': isDirector,

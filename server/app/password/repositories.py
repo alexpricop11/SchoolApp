@@ -49,3 +49,13 @@ class PasswordRepository:
         user.reset_code = None
         user.reset_code_expires = None
         await self.session.commit()
+
+    async def get_user_by_id(self, user_id: str) -> User | None:
+        from uuid import UUID
+        result = await self.session.execute(select(User).where(User.id == UUID(user_id)))
+        return result.scalar_one_or_none()
+
+    async def change_password(self, user: User, new_password_hash: str) -> bool:
+        user.password = new_password_hash
+        await self.session.commit()
+        return True

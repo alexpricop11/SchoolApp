@@ -26,14 +26,20 @@ class _SettingsPageState extends State<SettingsPage> {
     _darkModeEnabled = Get.isDarkMode;
   }
 
-  void _changeLanguage(String code) {
+  void _changeLanguage(String code) async {
     setState(() => _selectedLang = code);
+    // Persist language selection
+    await SecureStorageService.saveLanguage(code);
+    // Update Get locale for immediate effect across the app
     Get.updateLocale(Locale(code));
-  }
 
-  void _toggleDarkMode(bool value) {
-    setState(() => _darkModeEnabled = value);
-    Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+    Get.snackbar(
+      'success'.tr,
+      'language_changed'.tr,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
   }
 
   Future<void> _logout() async {
@@ -57,9 +63,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: Text('logout'.tr),
           ),
         ],
@@ -110,22 +114,6 @@ class _SettingsPageState extends State<SettingsPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Appearance Section
-                _buildSectionHeader('settings_appearance'.tr),
-                _buildSettingsCard([
-                  _buildSwitchTile(
-                    icon: Icons.dark_mode,
-                    iconColor: Colors.purple,
-                    title: 'settings_dark_mode'.tr,
-                    subtitle: 'settings_dark_mode_desc'.tr,
-                    value: _darkModeEnabled,
-                    onChanged: _toggleDarkMode,
-                  ),
-                ]),
-
-                const SizedBox(height: 24),
-
-                // Notifications Section
                 _buildSectionHeader('settings_notifications'.tr),
                 _buildSettingsCard([
                   _buildSwitchTile(
@@ -185,10 +173,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Center(
                   child: Text(
                     'v1.0.0',
-                    style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ),
               ],
@@ -250,7 +235,10 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Icon(icon, color: iconColor),
       ),
       title: Text(title, style: const TextStyle(color: Colors.white)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
@@ -295,7 +283,10 @@ class _SettingsPageState extends State<SettingsPage> {
         title,
         style: TextStyle(color: isDestructive ? Colors.red : Colors.white),
       ),
-      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
       trailing: Icon(Icons.chevron_right, color: Colors.white38),
       onTap: onTap,
     );

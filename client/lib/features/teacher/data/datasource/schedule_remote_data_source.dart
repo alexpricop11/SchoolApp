@@ -4,6 +4,7 @@ import '../../../../core/network/auth_options.dart';
 
 abstract class ScheduleRemoteDataSource {
   Future<List<ScheduleModel>> getClassSchedule(String classId, String token);
+  Future<List<ScheduleModel>> getTeacherSchedule(String teacherId, String token);
   Future<ScheduleModel> createSchedule(Map<String, dynamic> scheduleData, String token);
   Future<ScheduleModel> updateSchedule(String scheduleId, Map<String, dynamic> scheduleData, String token);
   Future<void> deleteSchedule(String scheduleId, String token);
@@ -18,6 +19,15 @@ class ScheduleRemoteDataSourceImpl implements ScheduleRemoteDataSource {
   Future<List<ScheduleModel>> getClassSchedule(String classId, String token) async {
     final response = await dio.get(
       '/schedules/class/$classId',
+      options: AuthOptions.bearer(token),
+    );
+    return (response.data as List).map((json) => ScheduleModel.fromJson(json)).toList();
+  }
+
+  @override
+  Future<List<ScheduleModel>> getTeacherSchedule(String teacherId, String token) async {
+    final response = await dio.get(
+      '/schedules/teacher/$teacherId',
       options: AuthOptions.bearer(token),
     );
     return (response.data as List).map((json) => ScheduleModel.fromJson(json)).toList();

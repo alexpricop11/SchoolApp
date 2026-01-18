@@ -26,6 +26,9 @@ class ScheduleService:
     async def get_class_schedule(self, class_id: uuid.UUID) -> List[Schedule]:
         return await self.repository.get_by_class(class_id)
 
+    async def get_teacher_schedule(self, teacher_id: uuid.UUID) -> List[Schedule]:
+        return await self.repository.get_by_teacher(teacher_id)
+
     async def update_schedule(self, schedule_id: uuid.UUID, schedule_data: ScheduleUpdate) -> Schedule:
         schedule = await self.repository.update(schedule_id, schedule_data)
         if not schedule:

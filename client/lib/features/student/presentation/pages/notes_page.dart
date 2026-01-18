@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../data/datasource/student_data_api.dart';
 import '../../data/model/grade_model.dart';
@@ -65,6 +64,23 @@ class _NotesPageState extends State<NotesPage> {
     return Colors.red;
   }
 
+  String _getGradeTypeLabel(String type) {
+    switch (type.toLowerCase()) {
+      case 'exam':
+        return 'grade_type_exam'.tr;
+      case 'test':
+        return 'grade_type_test'.tr;
+      case 'homework':
+        return 'grade_type_homework'.tr;
+      case 'assignment':
+        return 'grade_type_assignment'.tr;
+      case 'oral':
+        return 'grade_type_oral'.tr;
+      default:
+        return 'grade_type_other'.tr;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,8 +99,8 @@ class _NotesPageState extends State<NotesPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.grade, size: 64, color: Colors.white24),
-                          SizedBox(height: 16),
-                          Text('Nu ai note încă',
+                          const SizedBox(height: 16),
+                          Text('no_grades_yet'.tr,
                               style: TextStyle(color: Colors.white70, fontSize: 18)),
                         ],
                       ),
@@ -100,7 +116,7 @@ class _NotesPageState extends State<NotesPage> {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
+                              gradient: const LinearGradient(
                                 colors: [
                                   Color(0xFF1A1C20),
                                   Color(0xFF111827),
@@ -111,7 +127,7 @@ class _NotesPageState extends State<NotesPage> {
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.3),
                                   blurRadius: 8,
-                                  offset: Offset(0, 4),
+                                  offset: const Offset(0, 4),
                                 )
                               ],
                             ),
@@ -129,15 +145,15 @@ class _NotesPageState extends State<NotesPage> {
                                           children: [
                                             Text(
                                               subject,
-                                              style: TextStyle(
+                                              style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            SizedBox(height: 4),
+                                            const SizedBox(height: 4),
                                             Text(
-                                              '${grades.length} ${grades.length == 1 ? 'notă' : 'note'}',
+                                              'grades_count'.trParams({'count': grades.length.toString()}),
                                               style: TextStyle(
                                                 color: Colors.white60,
                                                 fontSize: 14,
@@ -147,7 +163,7 @@ class _NotesPageState extends State<NotesPage> {
                                         ),
                                       ),
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                         decoration: BoxDecoration(
                                           color: _getGradeColor(average.round()).withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(12),
@@ -159,7 +175,7 @@ class _NotesPageState extends State<NotesPage> {
                                         child: Column(
                                           children: [
                                             Text(
-                                              'Medie',
+                                              'average'.tr,
                                               style: TextStyle(
                                                 color: Colors.white70,
                                                 fontSize: 12,
@@ -179,7 +195,7 @@ class _NotesPageState extends State<NotesPage> {
                                     ],
                                   ),
                                 ),
-                                Divider(color: Colors.white10, height: 1),
+                                const Divider(color: Colors.white10, height: 1),
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Wrap(
@@ -187,7 +203,7 @@ class _NotesPageState extends State<NotesPage> {
                                     runSpacing: 8,
                                     children: grades.map((grade) {
                                       return Container(
-                                        padding: EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.05),
                                           borderRadius: BorderRadius.circular(10),
@@ -205,9 +221,9 @@ class _NotesPageState extends State<NotesPage> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            SizedBox(height: 4),
+                                            const SizedBox(height: 4),
                                             Text(
-                                              grade.type,
+                                              _getGradeTypeLabel(grade.type),
                                               style: TextStyle(
                                                 color: Colors.white60,
                                                 fontSize: 11,

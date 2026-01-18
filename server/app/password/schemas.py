@@ -9,3 +9,8 @@ class ResetPasswordSchema(BaseModel):
 
 class SendResetCodeSchema(BaseModel):
     email: EmailStr
+
+
+class ChangePasswordSchema(BaseModel):
+    current_password: str
+    new_password: str

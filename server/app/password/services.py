@@ -1,7 +1,7 @@
 from fastapi import HTTPException, BackgroundTasks
 from datetime import datetime
 from app.password.repositories import PasswordRepository
-from app.password.schemas import ResetPasswordSchema
+from app.password.schemas import ResetPasswordSchema, ChangePasswordSchema
 from app.password.utils import hash_password, send_email
 from app.password.template_email import build_reset_password_html
 
@@ -83,3 +83,21 @@ class PasswordService:
         password_hash = hash_password(data.password)
         await self.repo.set_password_and_activate(user, password_hash)
         return {"message": "Parola a fost setată și contul activat"}
+
+    async def change_password(self, user_id: str, data: ChangePasswordSchema):
+        user = await self.repo.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="Utilizatorul nu a fost găsit")
+
+        if not user.verify_password(data.current_password):
+            raise HTTPException(status_code=400, detail="Parola curentă este incorectă")
+
+        if data.current_password == data.new_password:
+            raise HTTPException(status_code=400, detail="Parola nouă trebuie să fie diferită de cea curentă")
+
+        if len(data.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Parola nouă trebuie să aibă minim 6 caractere")
+
+        new_password_hash = hash_password(data.new_password)
+        await self.repo.change_password(user, new_password_hash)
+        return {"message": "Parola a fost schimbată cu succes"}

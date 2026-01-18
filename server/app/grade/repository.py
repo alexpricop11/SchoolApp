@@ -2,6 +2,7 @@ import uuid
 from typing import List, Optional, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
+from datetime import datetime
 
 from app.grade.models import GradeModel
 from app.grade.schemas import GradeCreate, GradeUpdate
@@ -14,10 +15,21 @@ class GradeRepository:
 
     async def create(self, grade_data: GradeCreate) -> GradeModel:
         grade = GradeModel(**grade_data.model_dump())
+
+        if getattr(grade, 'created_at', None) is None:
+            grade.created_at = datetime.utcnow()
+        if getattr(grade, 'updated_at', None) is None:
+            grade.updated_at = datetime.utcnow()
+
         self.session.add(grade)
         await self.session.commit()
-        await self.session.refresh(grade)
-        return grade
+
+        result = await self.session.execute(
+            select(GradeModel)
+            .options(joinedload(GradeModel.subject))
+            .where(GradeModel.id == grade.id)
+        )
+        return result.scalar_one()
 
     async def get_by_id(self, grade_id: uuid.UUID) -> Optional[GradeModel]:
         result = await self.session.execute(
@@ -42,7 +54,8 @@ class GradeRepository:
         )
         return list(result.scalars().all()), total
 
-    async def get_by_student(self, student_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+    async def get_by_student(self, student_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[
+        List[GradeModel], int]:
         # Get total count
         count_result = await self.session.execute(
             select(func.count(GradeModel.id)).where(GradeModel.student_id == student_id)
@@ -60,7 +73,8 @@ class GradeRepository:
         )
         return list(result.scalars().all()), total
 
-    async def get_by_teacher(self, teacher_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+    async def get_by_teacher(self, teacher_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[
+        List[GradeModel], int]:
         count_result = await self.session.execute(
             select(func.count(GradeModel.id)).where(GradeModel.teacher_id == teacher_id)
         )
@@ -76,7 +90,8 @@ class GradeRepository:
         )
         return list(result.scalars().all()), total
 
-    async def get_by_subject(self, subject_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[List[GradeModel], int]:
+    async def get_by_subject(self, subject_id: uuid.UUID, skip: int = 0, limit: int = 100) -> Tuple[
+        List[GradeModel], int]:
         count_result = await self.session.execute(
             select(func.count(GradeModel.id)).where(GradeModel.subject_id == subject_id)
         )

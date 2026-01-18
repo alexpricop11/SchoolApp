@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.functions import func
 from sqlalchemy import ForeignKey
-from sqlalchemy.sql.sqltypes import Integer, DateTime
+from sqlalchemy.sql.sqltypes import Integer, DateTime, String
 
 from app.classes import Class
 from app.users.enums import UserRole
@@ -36,6 +36,9 @@ class User(Base):
     school_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("schools.id", ondelete="SET NULL"), nullable=True
     )
+
+    # Avatar/profile picture URL (optional)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

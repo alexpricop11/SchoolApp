@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:SchoolApp/features/student/presentation/pages/student_dashboard_page.dart';
 import 'package:flutter/material.dart';
 import 'package:SchoolApp/features/student/presentation/pages/student_home_page.dart';
 import 'package:get/get.dart';
@@ -164,21 +165,27 @@ class LoginController extends GetxController {
       return;
     }
 
+    // Save access token and user info
     await SecureStorageService.saveToken(
       authResponse.accessToken,
       authResponse.role,
       authResponse.userId,
     );
 
+    // Save refresh token for automatic token refresh
+    if (authResponse.refreshToken.isNotEmpty) {
+      await SecureStorageService.saveRefreshToken(authResponse.refreshToken);
+    }
+
     try {
       final role = UserRoleExtension.fromString(authResponse.role);
 
       switch (role) {
         case UserRole.student:
-          Get.offAll(() => StudentHomePage());
+          Get.to(() => StudentDashboardPage());
           break;
         case UserRole.teacher:
-          Get.offAll(()=> TeacherDashboardPage());
+          Get.to(()=> TeacherDashboardPage());
       }
     } catch (e) {
       Get.snackbar('Eroare', 'Rol necunoscut!');

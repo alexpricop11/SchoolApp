@@ -6,6 +6,7 @@ import '../model/schedule_model.dart';
 import '../model/homework_model.dart';
 import '../model/attendance_model.dart';
 import '../model/notification_model.dart';
+import '../model/material_model.dart';
 import '../model/student.dart';
 
 class StudentDataApi {
@@ -15,21 +16,13 @@ class StudentDataApi {
 
   // ==================== STUDENT ====================
 
-  Future<StudentModel?> getMe({bool forceRefresh = false}) async {
-    // Try cache first
-    if (!forceRefresh) {
-      final cached = CacheService.getCachedStudent();
-      if (cached != null && !CacheService.isCacheStale('student_cache')) {
-        debugPrint('>>> Using cached student data');
-        return StudentModel.fromJson(cached);
-      }
-    }
-
+  Future<StudentModel?> getMe() async {
     try {
       final response = await dio.get('/students/me');
       if (response.statusCode == 200) {
-        // Cache the response
-        await CacheService.cacheStudent(Map<String, dynamic>.from(response.data));
+        await CacheService.cacheStudent(
+          Map<String, dynamic>.from(response.data),
+        );
         return StudentModel.fromJson(response.data);
       }
       return null;
@@ -80,11 +73,15 @@ class StudentDataApi {
 
   // ==================== SCHEDULE ====================
 
-  Future<List<ScheduleModel>> getClassSchedule(String classId, {bool forceRefresh = false}) async {
+  Future<List<ScheduleModel>> getClassSchedule(
+    String classId, {
+    bool forceRefresh = false,
+  }) async {
     // Try cache first
     if (!forceRefresh) {
       final cached = CacheService.getCachedSchedule(classId);
-      if (cached != null && !CacheService.isCacheStale('schedule_cache:$classId')) {
+      if (cached != null &&
+          !CacheService.isCacheStale('schedule_cache:$classId')) {
         debugPrint('>>> Using cached schedule');
         return cached.map((json) => ScheduleModel.fromJson(json)).toList();
       }
@@ -115,11 +112,15 @@ class StudentDataApi {
 
   // ==================== HOMEWORK ====================
 
-  Future<List<HomeworkModel>> getClassHomework(String classId, {bool forceRefresh = false}) async {
+  Future<List<HomeworkModel>> getClassHomework(
+    String classId, {
+    bool forceRefresh = false,
+  }) async {
     // Try cache first
     if (!forceRefresh) {
       final cached = CacheService.getCachedHomework(classId);
-      if (cached != null && !CacheService.isCacheStale('homework_cache:$classId')) {
+      if (cached != null &&
+          !CacheService.isCacheStale('homework_cache:$classId')) {
         debugPrint('>>> Using cached homework');
         return cached.map((json) => HomeworkModel.fromJson(json)).toList();
       }
@@ -150,11 +151,15 @@ class StudentDataApi {
 
   // ==================== ATTENDANCE ====================
 
-  Future<List<AttendanceModel>> getMyAttendance(String studentId, {bool forceRefresh = false}) async {
+  Future<List<AttendanceModel>> getMyAttendance(
+    String studentId, {
+    bool forceRefresh = false,
+  }) async {
     // Try cache first
     if (!forceRefresh) {
       final cached = CacheService.getCachedAttendance(studentId);
-      if (cached != null && !CacheService.isCacheStale('attendance_cache:$studentId')) {
+      if (cached != null &&
+          !CacheService.isCacheStale('attendance_cache:$studentId')) {
         debugPrint('>>> Using cached attendance');
         return cached.map((json) => AttendanceModel.fromJson(json)).toList();
       }
@@ -185,11 +190,17 @@ class StudentDataApi {
 
   // ==================== NOTIFICATIONS ====================
 
-  Future<List<NotificationModel>> getMyNotifications({bool forceRefresh = false}) async {
+  Future<List<NotificationModel>> getMyNotifications({
+    bool forceRefresh = false,
+  }) async {
     // Try cache first
     if (!forceRefresh) {
       final cached = CacheService.getCachedNotifications();
-      if (cached != null && !CacheService.isCacheStale('notifications_cache', maxAge: Duration(minutes: 5))) {
+      if (cached != null &&
+          !CacheService.isCacheStale(
+            'notifications_cache',
+            maxAge: Duration(minutes: 5),
+          )) {
         debugPrint('>>> Using cached notifications');
         return cached.map((json) => NotificationModel.fromJson(json)).toList();
       }
@@ -224,6 +235,87 @@ class StudentDataApi {
       await CacheService.clearCache('notifications_cache');
     } catch (e) {
       debugPrint('Error marking notification as read: $e');
+    }
+  }
+
+  // ==================== MATERIALS ====================
+
+  Future<List<MaterialModel>> getClassMaterials(
+    String classId, {
+    bool forceRefresh = false,
+  }) async {
+    // Try cache first
+    if (!forceRefresh) {
+      final cached = CacheService.getCachedMaterials(classId);
+      if (cached != null &&
+          !CacheService.isCacheStale('materials_cache:$classId')) {
+        debugPrint('>>> Using cached materials');
+        return cached.map((json) => MaterialModel.fromJson(json)).toList();
+      }
+    }
+
+    try {
+      final response = await dio.get('/materials/class/$classId');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        // Cache the response
+        await CacheService.cacheMaterials(
+          classId,
+          data.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+        return data.map((json) => MaterialModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching materials: $e');
+      // Return cached data on error
+      final cached = CacheService.getCachedMaterials(classId);
+      if (cached != null) {
+        return cached.map((json) => MaterialModel.fromJson(json)).toList();
+      }
+      return [];
+    }
+  }
+
+  // ==================== PASSWORD ====================
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await dio.post(
+        '/password/change',
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message':
+              response.data['message'] ?? 'Parola a fost schimbată cu succes',
+        };
+      }
+      return {
+        'success': false,
+        'message': response.data['detail'] ?? 'Eroare la schimbarea parolei',
+      };
+    } on DioException catch (e) {
+      debugPrint('Error changing password: $e');
+      String message = 'Eroare la schimbarea parolei';
+      if (e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data.containsKey('detail')) {
+          message = data['detail'].toString();
+        }
+      }
+      return {'success': false, 'message': message};
+    } catch (e) {
+      debugPrint('Error changing password: $e');
+      return {'success': false, 'message': 'Eroare la schimbarea parolei'};
     }
   }
 }

@@ -1,11 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr
-
-from .user_base import UserRead
-from ...classes import ClassBase
 
 
 class TeacherBase(BaseModel):
@@ -30,8 +27,10 @@ class TeacherUpdate(TeacherCreate):
 
 
 class TeacherRead(TeacherBase):
-    user: UserRead
-    classes: list[ClassBase] = []
+    # Use a relaxed dict type for user to accept serialized dicts from ORM without strict validation
+    user: dict
+    # Use a generic dict list to avoid circular schema references (ClassOut -> TeacherRead -> StudentRead)
+    classes: list[dict] = []
     created_at: datetime
     updated_at: datetime
 

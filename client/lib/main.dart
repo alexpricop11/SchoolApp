@@ -1,24 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/di/injection.dart';
 import 'core/translation/app_translations.dart';
 import 'core/services/secure_storage_service.dart';
 import 'core/services/cache_service.dart';
 import 'features/auth/domain/entities/USER_ROLE.dart';
-import 'features/student/presentation/pages/home_page.dart';
-import 'features/student/presentation/pages/student_home_page.dart';
+import 'features/student/presentation/pages/student_dashboard_page.dart';
 import 'features/teacher/presentation/pages/teacher_page.dart';
 import 'welcome_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
+  // Initialize services and locale
   await Future.wait([
     initDependencies(),
     CacheService.init(),
   ]);
+
+  // Read persisted language or default to Romanian
+  final savedLang = await SecureStorageService.getLanguage();
+  final localeCode = savedLang ?? 'ro';
+
+  // Initialize date formatting for chosen locale
+  await initializeDateFormatting(localeCode, null);
 
   final token = await SecureStorageService.getToken();
   debugPrint("App started, token exists: ${token != null}");
@@ -36,7 +43,7 @@ void main() async {
           initialPage = TeacherDashboardPage();
           break;
         case UserRole.student:
-          initialPage = StudentHomePage();
+          initialPage = const StudentDashboardPage();
           break;
       }
     } catch (e) {
@@ -44,20 +51,21 @@ void main() async {
     }
   }
 
-  runApp(MyApp(initialPage: initialPage));
+  runApp(MyApp(initialPage: initialPage, initialLocaleCode: localeCode));
 }
 
 class MyApp extends StatelessWidget {
   final Widget initialPage;
+  final String initialLocaleCode;
 
-  const MyApp({super.key, required this.initialPage});
+  const MyApp({super.key, required this.initialPage, required this.initialLocaleCode});
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       translations: AppTranslations(),
-      locale: const Locale('ro', 'RO'),
+      locale: Locale(initialLocaleCode),
       fallbackLocale: const Locale('en', 'US'),
       home: initialPage,
       theme: ThemeData(

@@ -6,6 +6,7 @@ class Teacher extends Equatable {
   final String id;
   final String username;
   final String email;
+  final String? avatarUrl;
   final String? subject;
   final bool isHomeroom;
   final bool isDirector;
@@ -15,6 +16,7 @@ class Teacher extends Equatable {
     required this.id,
     required this.username,
     required this.email,
+    this.avatarUrl,
     this.subject,
     this.isHomeroom = false,
     this.isDirector = false,
@@ -26,6 +28,7 @@ class Teacher extends Equatable {
     id,
     username,
     email,
+    avatarUrl,
     subject,
     isHomeroom,
     isDirector,

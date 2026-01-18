@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.attendance.routes import router as attendance_router
 from app.auth.routes import router as auth_router
@@ -26,6 +28,14 @@ app = FastAPI(
     description="Backend API for School Management Application",
     version="1.0.0"
 )
+
+# Ensure uploads directory exists
+UPLOADS_DIR = os.environ.get("UPLOADS_DIR", "uploads")
+if not os.path.exists(UPLOADS_DIR):
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+# Mount static files for uploaded assets
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 ClassBase.model_rebuild(_types_namespace={"TeacherRead": TeacherRead, "StudentRead": StudentRead})
 

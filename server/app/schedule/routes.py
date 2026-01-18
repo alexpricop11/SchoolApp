@@ -34,11 +34,20 @@ async def get_class_schedule(
     return await service.get_class_schedule(class_id)
 
 
+@router.get("/teacher/{teacher_id}", response_model=List[ScheduleRead])
+async def get_teacher_schedule(
+    teacher_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    service: ScheduleService = Depends(get_schedule_service)
+):
+    """Get all schedules for a specific teacher"""
+    return await service.get_teacher_schedule(teacher_id)
+
+
 @router.get("/{schedule_id}", response_model=ScheduleRead)
 async def get_schedule(
     schedule_id: uuid.UUID,
-    current_user: dict = Depends(get_current_user),
-    service: ScheduleService = Depends(get_schedule_service)
+        service: ScheduleService = Depends(get_schedule_service)
 ):
     return await service.get_schedule(schedule_id)
 

@@ -12,4 +12,9 @@ class TeacherRepositoryImpl implements TeacherRepository {
   Future<Teacher> getCurrentTeacher(String token) async {
     return await remoteDataSource.getCurrentTeacher(token);
   }
+
+  @override
+  Future<String> uploadAvatar(String userId, String token, String filePath) async {
+    return await remoteDataSource.uploadAvatar(userId, token, filePath);
+  }
 }

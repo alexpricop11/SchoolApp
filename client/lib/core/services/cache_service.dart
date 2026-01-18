@@ -10,6 +10,7 @@ class CacheService {
   static const String _notificationsBox = 'notifications_cache';
   static const String _attendanceBox = 'attendance_cache';
   static const String _studentBox = 'student_cache';
+  static const String _materialsBox = 'materials_cache';
   static const String _metadataBox = 'cache_metadata';
 
   static bool _initialized = false;
@@ -27,6 +28,7 @@ class CacheService {
       Hive.openBox<dynamic>(_notificationsBox),
       Hive.openBox<dynamic>(_attendanceBox),
       Hive.openBox<dynamic>(_studentBox),
+      Hive.openBox<dynamic>(_materialsBox),
       Hive.openBox<dynamic>(_metadataBox),
     ]);
 
@@ -125,6 +127,24 @@ class CacheService {
     );
   }
 
+  // ==================== MATERIALS ====================
+
+  static Future<void> cacheMaterials(
+      String classId, List<Map<String, dynamic>> materials) async {
+    final box = Hive.box<dynamic>(_materialsBox);
+    await box.put(classId, materials);
+    await _updateTimestamp('$_materialsBox:$classId');
+  }
+
+  static List<Map<String, dynamic>>? getCachedMaterials(String classId) {
+    final box = Hive.box<dynamic>(_materialsBox);
+    final data = box.get(classId);
+    if (data == null) return null;
+    return List<Map<String, dynamic>>.from(
+      (data as List).map((e) => Map<String, dynamic>.from(e)),
+    );
+  }
+
   // ==================== STUDENT ====================
 
   static Future<void> cacheStudent(Map<String, dynamic> student) async {
@@ -175,6 +195,7 @@ class CacheService {
       Hive.box<dynamic>(_notificationsBox).clear(),
       Hive.box<dynamic>(_attendanceBox).clear(),
       Hive.box<dynamic>(_studentBox).clear(),
+      Hive.box<dynamic>(_materialsBox).clear(),
       Hive.box<dynamic>(_metadataBox).clear(),
     ]);
     debugPrint('All cache cleared');

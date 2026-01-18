@@ -38,12 +38,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final response = await dio.post(url, data: data);
       if (response.statusCode == 200) {
         final user = UserModel.fromJson(response.data);
-        user.accessToken = response.data['access_token'];
+        // Ensure tokens are set from response
+        user.accessToken = response.data['access_token'] ?? '';
+        user.refreshToken = response.data['refresh_token'] ?? '';
         return user;
-      } else {}
+      }
     } on DioException catch (e) {
-      if (e.response != null) {}
-    } catch (e) {}
+      print('Login error: ${e.response?.data}');
+    } catch (e) {
+      print('Login error: $e');
+    }
 
     return null;
   }

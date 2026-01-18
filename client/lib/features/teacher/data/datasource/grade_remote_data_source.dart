@@ -4,9 +4,14 @@ import '../../../../core/network/auth_options.dart';
 
 abstract class GradeRemoteDataSource {
   Future<List<GradeModel>> getTeacherGrades(String teacherId, String token);
+
   Future<List<GradeModel>> getStudentGrades(String studentId, String token);
+
   Future<GradeModel> createGrade(Map<String, dynamic> gradeData, String token);
-  Future<GradeModel> updateGrade(String gradeId, Map<String, dynamic> gradeData, String token);
+
+  Future<GradeModel> updateGrade(String gradeId, Map<String, dynamic> gradeData,
+      String token);
+
   Future<void> deleteGrade(String gradeId, String token);
 }
 
@@ -16,25 +21,32 @@ class GradeRemoteDataSourceImpl implements GradeRemoteDataSource {
   GradeRemoteDataSourceImpl({required this.dio});
 
   @override
-  Future<List<GradeModel>> getTeacherGrades(String teacherId, String token) async {
+  Future<List<GradeModel>> getTeacherGrades(String teacherId,
+      String token) async {
     final response = await dio.get(
       '/grades/teacher/$teacherId',
       options: AuthOptions.bearer(token),
     );
-    return (response.data as List).map((json) => GradeModel.fromJson(json)).toList();
+    return (response.data as List)
+        .map((json) => GradeModel.fromJson(json))
+        .toList();
   }
 
   @override
-  Future<List<GradeModel>> getStudentGrades(String studentId, String token) async {
+  Future<List<GradeModel>> getStudentGrades(String studentId,
+      String token) async {
     final response = await dio.get(
       '/grades/student/$studentId',
       options: AuthOptions.bearer(token),
     );
-    return (response.data as List).map((json) => GradeModel.fromJson(json)).toList();
+    return (response.data as List)
+        .map((json) => GradeModel.fromJson(json))
+        .toList();
   }
 
   @override
-  Future<GradeModel> createGrade(Map<String, dynamic> gradeData, String token) async {
+  Future<GradeModel> createGrade(Map<String, dynamic> gradeData,
+      String token) async {
     final response = await dio.post(
       '/grades/',
       data: gradeData,
@@ -44,7 +56,8 @@ class GradeRemoteDataSourceImpl implements GradeRemoteDataSource {
   }
 
   @override
-  Future<GradeModel> updateGrade(String gradeId, Map<String, dynamic> gradeData, String token) async {
+  Future<GradeModel> updateGrade(String gradeId, Map<String, dynamic> gradeData,
+      String token) async {
     final response = await dio.put(
       '/grades/$gradeId',
       data: gradeData,

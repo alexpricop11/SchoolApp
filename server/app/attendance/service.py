@@ -42,3 +42,9 @@ class AttendanceService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Attendance with id {attendance_id} not found"
             )
+
+    async def bulk_create_attendance(self, attendances: List[AttendanceCreate]) -> List[Attendance]:
+        created = []
+        for a in attendances:
+            created.append(await self.repository.create(a))
+        return created

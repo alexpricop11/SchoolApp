@@ -1,6 +1,6 @@
 import uuid
 from doctest import Example
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
@@ -15,8 +15,8 @@ class TeacherService:
         self.repository = repository
         self.user_repository = user_repository
 
-    async def get_all_teachers(self) -> List[TeacherRead]:
-        teachers = await self.repository.get_all()
+    async def get_all_teachers(self, skip: int = 0, limit: int = 100, q: Optional[str] = None) -> List[TeacherRead]:
+        teachers = await self.repository.get_all(skip=skip, limit=limit, q=q)
         if not teachers:
             return []
         return teachers
@@ -93,3 +93,6 @@ class TeacherService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Teacher with id {teacher_id} not found",
             )
+
+    async def get_students_for_teacher(self, teacher_id: uuid.UUID):
+        return await self.repository.get_students_for_teacher(teacher_id)

@@ -9,7 +9,7 @@ class AppConfig {
   static const bool isProduction = false;
 
   // Get the current base URL based on environment
-  static String get baseUrl => isProduction ? prodBaseUrl : devBaseUrl;
+  static String get baseUrl => devBaseUrl;
 
   // API timeouts
   static const Duration connectTimeout = Duration(seconds: 30);

@@ -44,6 +44,8 @@ dependencies:
   lucide_icons: ^0.257.0
   flutter_screenutil: ^5.9.0
   equatable: ^2.0.7
+  image_picker: ^0.8.7+4
+  url_launcher: ^6.2.5
 
   # Local caching
   hive: ^2.2.3

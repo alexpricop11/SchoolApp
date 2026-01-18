@@ -24,6 +24,7 @@ class UserCreate(BaseModel):
     role: UserRole
     is_activated: bool = False
     school_id: Optional[uuid.UUID] = None
+    avatar_url: Optional[str] = None
 
 
 class UserRead(BaseModel):
@@ -34,6 +35,7 @@ class UserRead(BaseModel):
     is_activated: bool
     created_at: datetime
     updated_at: datetime
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

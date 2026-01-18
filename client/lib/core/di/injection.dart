@@ -1,13 +1,17 @@
 import 'package:SchoolApp/features/student/domain/repositories/student_repository.dart';
 import 'package:SchoolApp/features/student/domain/usecase/student_use_case.dart';
 import 'package:get_it/get_it.dart';
+import 'package:get/get.dart' as getx;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import '../../features/auth/data/datasource/auth_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/check_email_usecase.dart';
 import '../../features/auth/domain/usecases/login_usecase.dart';
 import '../../features/auth/presentation/controllers/login_controller.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/school/data/datasource/school_remote_data_source.dart';
 import '../../features/school/data/repositories/school_repository_impl.dart';
 import '../../features/school/domain/repositories/school_repository.dart';
@@ -30,6 +34,7 @@ import '../../features/teacher/data/datasource/schedule_remote_data_source.dart'
 import '../../features/teacher/data/datasource/material_remote_data_source.dart';
 import '../../features/teacher/presentation/controllers/teacher_dashboard_controller.dart';
 import '../config/app_config.dart';
+import '../services/secure_storage_service.dart';
 import '../../features/auth/data/datasource/password_data_source.dart';
 import '../../features/auth/data/repositories/password_repositories_impl.dart';
 import '../../features/auth/domain/repositories/password_repositories.dart';
@@ -38,17 +43,50 @@ import '../../features/auth/presentation/controllers/password_controller.dart';
 
 final sl = GetIt.instance;
 
+bool _isRedirectingToLogin = false;
+
 Future<void> initDependencies() async {
-  sl.registerLazySingleton<Dio>(
-    () => Dio(
-      BaseOptions(
-        baseUrl: AppConfig.baseUrl,
-        connectTimeout: AppConfig.connectTimeout,
-        receiveTimeout: AppConfig.receiveTimeout,
-        headers: {'Content-Type': 'application/json'},
-      ),
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: AppConfig.baseUrl,
+      connectTimeout: AppConfig.connectTimeout,
+      receiveTimeout: AppConfig.receiveTimeout,
+      headers: {'Content-Type': 'application/json'},
     ),
   );
+
+  // Add interceptor for 401 handling
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onError: (error, handler) async {
+        debugPrint('>>> DI Dio Error: ${error.response?.statusCode} on ${error.requestOptions.path}');
+
+        if (error.response?.statusCode == 401) {
+          // Try to refresh token
+          final refreshed = await _tryRefreshToken(dio);
+          if (refreshed) {
+            // Retry original request with new token
+            final token = await SecureStorageService.getToken();
+            error.requestOptions.headers['Authorization'] = 'Bearer $token';
+            try {
+              final response = await dio.fetch(error.requestOptions);
+              return handler.resolve(response);
+            } catch (e) {
+              if (e is DioException && e.response?.statusCode == 401) {
+                _handleUnauthorized();
+              }
+              return handler.next(error);
+            }
+          } else {
+            _handleUnauthorized();
+          }
+        }
+        return handler.next(error);
+      },
+    ),
+  );
+
+  sl.registerLazySingleton<Dio>(() => dio);
 
   sl.registerLazySingleton<StudentRemoteDataSource>(
     () => StudentRemoteDataSourceImpl(sl<Dio>()),
@@ -170,4 +208,62 @@ Future<void> initDependencies() async {
 
   // Teacher Controller
   sl.registerFactory(() => TeacherDashboardController());
+}
+
+Future<bool> _tryRefreshToken(Dio dio) async {
+  try {
+    final refreshToken = await SecureStorageService.getRefreshToken();
+    if (refreshToken == null) {
+      debugPrint('>>> No refresh token available');
+      return false;
+    }
+
+    debugPrint('>>> Attempting token refresh...');
+    final freshDio = Dio(BaseOptions(baseUrl: AppConfig.baseUrl));
+    final response = await freshDio.post(
+      '/auth/refresh',
+      data: {'refresh_token': refreshToken},
+    );
+
+    if (response.statusCode == 200) {
+      final newAccessToken = response.data['access_token'];
+      final newRefreshToken = response.data['refresh_token'];
+      final role = await SecureStorageService.getRole();
+      final userId = await SecureStorageService.getUserId();
+
+      await SecureStorageService.saveToken(newAccessToken, role ?? '', userId ?? '');
+      if (newRefreshToken != null) {
+        await SecureStorageService.saveRefreshToken(newRefreshToken);
+      }
+      debugPrint('>>> Token refreshed successfully');
+      return true;
+    }
+  } catch (e) {
+    debugPrint('>>> Token refresh failed: $e');
+  }
+  return false;
+}
+
+void _handleUnauthorized() async {
+  if (_isRedirectingToLogin) return;
+  _isRedirectingToLogin = true;
+
+  debugPrint('>>> Unauthorized - redirecting to login');
+
+  await SecureStorageService.deleteToken();
+
+  // Use addPostFrameCallback to ensure GetX is ready
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    getx.Get.snackbar(
+      'Sesiune expirată',
+      'Te rugăm să te autentifici din nou',
+      snackPosition: getx.SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 3),
+    );
+    getx.Get.offAll(() => const LoginPage());
+  });
+
+  Future.delayed(const Duration(seconds: 2), () {
+    _isRedirectingToLogin = false;
+  });
 }

@@ -45,10 +45,19 @@ class TeacherInfo(BaseModel):
         from_attributes = True
 
 
+class ClassInfo(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class ScheduleRead(ScheduleBase):
     id: uuid.UUID
     created_at: datetime
     subject: Optional[SubjectInfo] = None
+    class_: Optional[ClassInfo] = None
 
     class Config:
         from_attributes = True
