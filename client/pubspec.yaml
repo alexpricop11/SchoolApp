@@ -54,6 +54,12 @@ dependencies:
   # WebSocket
   web_socket_channel: ^3.0.2
 
+  # Connectivity
+  connectivity_plus: ^6.0.0
+
+  # UUID generation
+  uuid: ^4.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

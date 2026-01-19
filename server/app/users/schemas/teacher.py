@@ -4,6 +4,9 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
+from app.users.schemas.user_base import UserRead
+from app.classes.schemas import ClassSlim
+
 
 class TeacherBase(BaseModel):
     user_id: uuid.UUID
@@ -27,10 +30,8 @@ class TeacherUpdate(TeacherCreate):
 
 
 class TeacherRead(TeacherBase):
-    # Use a relaxed dict type for user to accept serialized dicts from ORM without strict validation
-    user: dict
-    # Use a generic dict list to avoid circular schema references (ClassOut -> TeacherRead -> StudentRead)
-    classes: list[dict] = []
+    user: UserRead
+    classes: list[ClassSlim] = []
     created_at: datetime
     updated_at: datetime
 

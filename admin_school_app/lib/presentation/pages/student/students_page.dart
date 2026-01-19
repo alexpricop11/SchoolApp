@@ -66,16 +66,21 @@ class StudentsPage extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: isMobile
                       ? ListView.builder(
-                    itemCount: controller.students.length,
-                    itemBuilder: (context, index) {
-                      final student = controller.students[index];
-                      return _buildMobileCard(controller, student);
-                    },
-                  )
-                      : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: _buildDataTable(controller),
-                  ),
+                          itemCount: controller.students.length,
+                          itemBuilder: (context, index) {
+                            final student = controller.students[index];
+                            return _buildMobileCard(controller, student);
+                          },
+                        )
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _buildDataTable(controller),
+                            ),
+                          ),
+                        ),
                 ),
               );
             }),
@@ -126,6 +131,10 @@ class StudentsPage extends StatelessWidget {
   }
 
   Widget _buildMobileCard(StudentsController controller, student) {
+    final username = student.user?.username ?? '-';
+    final className = student.className ?? '-';
+    final schoolName = student.schoolName ?? '-';
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       color: const Color(0xFF1A1F3A),
@@ -135,15 +144,15 @@ class StudentsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('User ID: ${student.userId}',
+            Text(username,
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('ID: ${student.id ?? "-"}',
+            Text('Clasă: $className',
                 style: TextStyle(color: Colors.white.withOpacity(0.7))),
-            Text('Clasă ID: ${student.classId ?? "-"}',
+            Text('Școală: $schoolName',
                 style: TextStyle(color: Colors.white.withOpacity(0.7))),
             const SizedBox(height: 12),
             Row(
@@ -151,7 +160,7 @@ class StudentsPage extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () =>
-                        Get.to(() => StudentFormPage(studentId: student.id)),
+                        Get.to(() => StudentFormPage(studentId: student.userId)),
                     icon: const Icon(Icons.edit, size: 16),
                     label: const Text('Editează'),
                     style: ElevatedButton.styleFrom(
@@ -164,7 +173,7 @@ class StudentsPage extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _showDeleteDialog(controller, student.id!),
+                    onPressed: () => _showDeleteDialog(controller, student.userId),
                     icon: const Icon(Icons.delete, size: 16),
                     label: const Text('Șterge'),
                     style: ElevatedButton.styleFrom(
@@ -192,27 +201,31 @@ class StudentsPage extends StatelessWidget {
           color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
       dataTextStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
       columns: const [
-        DataColumn(label: Text('ID')),
-        DataColumn(label: Text('User ID')),
-        DataColumn(label: Text('Clasă ID')),
+        DataColumn(label: Text('Username')),
+        DataColumn(label: Text('Clasă')),
+        DataColumn(label: Text('Școală')),
         DataColumn(label: Text('Acțiuni')),
       ],
       rows: controller.students.map((student) {
+        final username = student.user?.username ?? '-';
+        final className = student.className ?? '-';
+        final schoolName = student.schoolName ?? '-';
+
         return DataRow(cells: [
-          DataCell(Text(student.id ?? '-')),
-          DataCell(Text(student.userId.toString())),
-          DataCell(Text(student.classId.toString())),
+          DataCell(Text(username)),
+          DataCell(Text(className)),
+          DataCell(Text(schoolName)),
           DataCell(Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.white),
                 onPressed: () =>
-                    Get.to(() => StudentFormPage(studentId: student.id)),
+                    Get.to(() => StudentFormPage(studentId: student.userId)),
               ),
               IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _showDeleteDialog(controller, student.id!),
+                onPressed: () => _showDeleteDialog(controller, student.userId),
               ),
             ],
           )),
@@ -284,7 +297,7 @@ class StudentsPage extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(StudentsController controller, String studentId) {
+  void _showDeleteDialog(StudentsController controller, String studentUserId) {
     Get.dialog(
       Dialog(
         backgroundColor: Colors.transparent,
@@ -338,7 +351,7 @@ class StudentsPage extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         Get.back();
-                        controller.deleteStudent(studentId);
+                        controller.deleteStudent(studentUserId);
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),

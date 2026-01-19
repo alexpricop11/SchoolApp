@@ -12,6 +12,13 @@ class AdminUserModel extends AdminUserEntity {
     super.updatedAt,
   });
 
+  static DateTime? _parseDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
+    return null;
+  }
+
   factory AdminUserModel.fromJson(Map<String, dynamic> json) {
     return AdminUserModel(
       id: json['id']?.toString(),
@@ -20,12 +27,8 @@ class AdminUserModel extends AdminUserEntity {
       role: json['role'] as String,
       isActivated: json['is_activated'] as bool? ?? false,
       schoolId: json['school_id']?.toString(),
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
     );
   }
 

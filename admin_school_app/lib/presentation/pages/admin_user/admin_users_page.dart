@@ -72,9 +72,14 @@ class AdminUsersPage extends StatelessWidget {
                             return _buildMobileCard(controller, user);
                           },
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _buildDataTable(controller),
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _buildDataTable(controller),
+                            ),
+                          ),
                         ),
                 ),
               );
@@ -156,10 +161,7 @@ class AdminUsersPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'ID: ${user.id?.substring(0, 8) ?? "-"}',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
-            ),
+            // remove ID row on mobile
             Text(
               'Email: ${user.email ?? "-"}',
               style: TextStyle(color: Colors.white.withOpacity(0.7)),
@@ -169,7 +171,7 @@ class AdminUsersPage extends StatelessWidget {
               style: TextStyle(color: Colors.white.withOpacity(0.7)),
             ),
             Text(
-              'School ID: ${user.schoolId?.substring(0, 8) ?? "-"}',
+              'Școală: ${user.schoolName ?? controller.schoolNameFor(user.schoolId)}',
               style: TextStyle(color: Colors.white.withOpacity(0.7)),
             ),
             Row(
@@ -232,7 +234,8 @@ class AdminUsersPage extends StatelessWidget {
         const Color(0xFFEC4899).withOpacity(0.15),
       ),
       headingRowHeight: 60,
-      dataRowHeight: 65,
+      dataRowMinHeight: 65,
+      dataRowMaxHeight: 65,
       headingTextStyle: const TextStyle(
         color: Colors.white,
         fontWeight: FontWeight.bold,
@@ -243,22 +246,20 @@ class AdminUsersPage extends StatelessWidget {
         fontSize: 14,
       ),
       columns: const [
-        DataColumn(label: Text('ID')),
         DataColumn(label: Text('Username')),
         DataColumn(label: Text('Email')),
         DataColumn(label: Text('Rol')),
-        DataColumn(label: Text('School ID')),
+        DataColumn(label: Text('Școală')),
         DataColumn(label: Text('Activat')),
         DataColumn(label: Text('Acțiuni')),
       ],
       rows: controller.users.map((user) {
         return DataRow(
           cells: [
-            DataCell(Text(user.id?.substring(0, 8) ?? '-')),
             DataCell(Text(user.username)),
             DataCell(Text(user.email)),
             DataCell(Text(user.role.toUpperCase())),
-            DataCell(Text(user.schoolId?.substring(0, 8) ?? '-')),
+            DataCell(Text(user.schoolName ?? controller.schoolNameFor(user.schoolId))),
             DataCell(
               Icon(
                 user.isActivated ? Icons.check_circle : Icons.cancel,

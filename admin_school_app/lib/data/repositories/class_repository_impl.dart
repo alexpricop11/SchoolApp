@@ -23,7 +23,6 @@ class ClassRepositoryImpl implements ClassRepository {
     final model = ClassModel(
       id: classEntity.id,
       name: classEntity.name,
-      gradeId: classEntity.gradeId,
       teacherId: classEntity.teacherId,
       schoolId: classEntity.schoolId,
     );
@@ -35,7 +34,6 @@ class ClassRepositoryImpl implements ClassRepository {
     final model = ClassModel(
       id: classEntity.id,
       name: classEntity.name,
-      gradeId: classEntity.gradeId,
       teacherId: classEntity.teacherId,
       schoolId: classEntity.schoolId,
     );

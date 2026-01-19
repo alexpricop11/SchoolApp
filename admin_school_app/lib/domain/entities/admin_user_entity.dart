@@ -5,6 +5,7 @@ class AdminUserEntity {
   final String role;
   final bool isActivated;
   final String? schoolId;
+  final String? schoolName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -15,6 +16,7 @@ class AdminUserEntity {
     required this.role,
     this.isActivated = false,
     this.schoolId,
+    this.schoolName,
     this.createdAt,
     this.updatedAt,
   });

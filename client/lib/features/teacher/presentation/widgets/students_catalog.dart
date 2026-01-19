@@ -879,33 +879,27 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                   final ids = [if (student.userId != null) student.userId!];
                   if (ids.isEmpty) return;
 
+                  // Închidem dialogul imediat după "Salvează".
+                  // Astfel UX-ul e bun și în offline (nu rămâne blocat).
+                  if (Get.isDialogOpen ?? false) {
+                    Get.back();
+                  }
+
                   try {
-                    // Punem await ca să așteptăm răspunsul de la server
                     await widget.controller.createGradesForStudents(ids, {
                       'value': grade,
                       'types': gradeType,
                       'subject_id': subjectId,
                     });
 
-                    // DOAR DACĂ A REUȘIT, închidem dialogul
-                    if (Get.isDialogOpen ?? false) {
-                      Get.back();
-                    }
-
-                    Get.snackbar(
-                      'Succes',
-                      'Nota a fost adăugată.',
-                      snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: Colors.green.withOpacity(0.7),
-                      colorText: Colors.white,
-                    );
+                    // createGradesForStudents deja afișează snackbar-uri (Succes/Offline/Parțial)
+                    // dar păstrăm și un fallback discret dacă e nevoie.
                   } catch (e) {
-                    // Dacă e eroare (ex: timeout sau eroare server), dialogul RĂMÂNE deschis
                     Get.snackbar(
                       'Eroare',
-                      'Nu s-a putut salva nota. Încearcă din nou.',
+                      'Nu s-a putut salva nota: $e',
                       snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: Colors.redAccent,
+                      backgroundColor: Colors.red.withOpacity(0.7),
                       colorText: Colors.white,
                     );
                   }

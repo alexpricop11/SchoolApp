@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/admin_user/admin_user_form_controller.dart';
+import '../../widgets/searchable_id_dropdown_field.dart';
 
 class AdminUserFormPage extends StatelessWidget {
   final String? userId;
@@ -41,10 +42,20 @@ class AdminUserFormPage extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Rol *', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: controller.schoolIdController,
-                decoration: const InputDecoration(labelText: 'School ID', border: OutlineInputBorder()),
-              ),
+              Obx(() {
+                if (controller.schoolOptions.isEmpty) {
+                  return TextField(
+                    controller: controller.schoolIdController,
+                    decoration: const InputDecoration(labelText: 'Școală (opțional)', border: OutlineInputBorder()),
+                  );
+                }
+                return SearchableIdDropdownField(
+                  label: 'Școală (opțional)',
+                  value: controller.schoolIdController.text,
+                  options: controller.schoolOptions,
+                  onChanged: controller.setSelectedSchoolId,
+                );
+              }),
               const SizedBox(height: 16),
               Row(
                 children: [

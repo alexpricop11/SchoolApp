@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from app.users.schemas import TeacherRead, StudentRead
+from pydantic import BaseModel
 
 
 class ClassBase(BaseModel):
     name: str
     school_id: UUID
-    teachers: Optional[List[TeacherRead]] = None
-    students: Optional[List[StudentRead]] = None
 
     model_config = {"from_attributes": True}
 
@@ -32,6 +28,15 @@ class ClassOut(ClassBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = {"from_attributes": True}
+
+
+class ClassSlim(BaseModel):
+    """Lightweight class representation for embedding in other schemas."""
+
+    id: UUID
+    name: str
+    school_id: UUID
+    teacher_id: Optional[UUID] = None
+
+    model_config = {"from_attributes": True}

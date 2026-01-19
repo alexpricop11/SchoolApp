@@ -21,6 +21,8 @@ import '../../domain/entities/schedule_entity.dart';
 import '../../domain/entities/material_entity.dart';
 import '../../../student/data/model/student.dart';
 import '../../domain/usecases/get_current_teacher.dart';
+import '../../../../core/offline/offline_action_handler.dart';
+import '../../../../core/sync/sync_operation.dart';
 
 class TeacherDashboardController extends GetxController {
   // Services
@@ -66,6 +68,9 @@ class TeacherDashboardController extends GetxController {
   final isLoading = false.obs;
   final errorMessage = Rxn<String>();
   final currentIndex = 0.obs;
+
+  final OfflineActionHandler offlineHandler = GetIt.instance.get<
+      OfflineActionHandler>();
 
   @override
   void onInit() {
@@ -172,7 +177,9 @@ class TeacherDashboardController extends GetxController {
 
       // Ensure teacher_id is set
       if ((gradeData['teacher_id'] == null ||
-              gradeData['teacher_id'].toString().isEmpty) &&
+          gradeData['teacher_id']
+              .toString()
+              .isEmpty) &&
           teacher.value != null) {
         gradeData['teacher_id'] = teacher.value!.id;
       }
@@ -193,10 +200,8 @@ class TeacherDashboardController extends GetxController {
     }
   }
 
-  Future<void> updateGrade(
-    String gradeId,
-    Map<String, dynamic> gradeData,
-  ) async {
+  Future<void> updateGrade(String gradeId,
+      Map<String, dynamic> gradeData,) async {
     try {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
@@ -262,32 +267,38 @@ class TeacherDashboardController extends GetxController {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
 
-      // Ensure teacher_id is set
       if ((homeworkData['teacher_id'] == null ||
-              homeworkData['teacher_id'].toString().isEmpty) &&
+          homeworkData['teacher_id']
+              .toString()
+              .isEmpty) &&
           teacher.value != null) {
         homeworkData['teacher_id'] = teacher.value!.id;
       }
 
-      await homeworkDataSource.createHomework(homeworkData, token);
-      Get.snackbar(
-        'Succes',
-        'Tema a fost creată cu succes!',
-        snackPosition: SnackPosition.BOTTOM,
+      final res = await offlineHandler.run(
+        opType: OperationType.create,
+        entity: 'homework',
+        payload: Map<String, dynamic>.from(homeworkData),
+        remoteCall: () =>
+            homeworkDataSource.createHomework(homeworkData, token),
       );
+
+      if (res != null) {
+        Get.snackbar('Succes', 'Tema a fost creată cu succes!',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        Get.snackbar('Offline',
+            'Tema a fost salvată local și va fi trimisă când revine serverul.',
+            snackPosition: SnackPosition.BOTTOM);
+      }
     } catch (e) {
-      Get.snackbar(
-        'Eroare',
-        'Eroare la crearea temei: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar('Eroare', 'Eroare la crearea temei: $e',
+          snackPosition: SnackPosition.BOTTOM);
     }
   }
 
-  Future<void> updateHomework(
-    String homeworkId,
-    Map<String, dynamic> homeworkData,
-  ) async {
+  Future<void> updateHomework(String homeworkId,
+      Map<String, dynamic> homeworkData,) async {
     try {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
@@ -353,7 +364,9 @@ class TeacherDashboardController extends GetxController {
 
       // Ensure teacher_id is set
       if ((attendanceData['teacher_id'] == null ||
-              attendanceData['teacher_id'].toString().isEmpty) &&
+          attendanceData['teacher_id']
+              .toString()
+              .isEmpty) &&
           teacher.value != null) {
         attendanceData['teacher_id'] = teacher.value!.id;
       }
@@ -364,25 +377,30 @@ class TeacherDashboardController extends GetxController {
         attendanceData['attendance_date'] = dt.toIso8601String();
       }
 
-      await attendanceDataSource.createAttendance(attendanceData, token);
-      Get.snackbar(
-        'Succes',
-        'Prezența a fost înregistrată!',
-        snackPosition: SnackPosition.BOTTOM,
+      final res = await offlineHandler.run(
+        opType: OperationType.create,
+        entity: 'attendance',
+        payload: Map<String, dynamic>.from(attendanceData),
+        remoteCall: () =>
+            attendanceDataSource.createAttendance(attendanceData, token),
       );
+
+      if (res != null) {
+        Get.snackbar('Succes', 'Prezența a fost înregistrată!',
+            snackPosition: SnackPosition.BOTTOM);
+      } else {
+        Get.snackbar('Offline',
+            'Prezența a fost salvată local și va fi sincronizată automat.',
+            snackPosition: SnackPosition.BOTTOM);
+      }
     } catch (e) {
-      Get.snackbar(
-        'Eroare',
-        'Eroare la înregistrarea prezenței: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      Get.snackbar('Eroare', 'Eroare la înregistrarea prezenței: $e',
+          snackPosition: SnackPosition.BOTTOM);
     }
   }
 
-  Future<void> updateAttendance(
-    String attendanceId,
-    Map<String, dynamic> attendanceData,
-  ) async {
+  Future<void> updateAttendance(String attendanceId,
+      Map<String, dynamic> attendanceData,) async {
     try {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
@@ -494,7 +512,7 @@ class TeacherDashboardController extends GetxController {
         'is_homeroom': teacher.value!.isHomeroom,
         'is_director': teacher.value!.isDirector,
         'classes':
-            teacher.value!.classes?.map((c) => c.toJson()).toList() ?? [],
+        teacher.value!.classes?.map((c) => c.toJson()).toList() ?? [],
       });
       teacher.value = updated;
       Get.snackbar(
@@ -545,7 +563,9 @@ class TeacherDashboardController extends GetxController {
   }
 
   DayOfWeek getTodayEnum() {
-    switch (DateTime.now().weekday) {
+    switch (DateTime
+        .now()
+        .weekday) {
       case 1:
         return DayOfWeek.monday;
       case 2:
@@ -595,8 +615,8 @@ class TeacherDashboardController extends GetxController {
     final today = getTodayEnum();
 
     final todayLessons =
-        teacherSchedules.where((s) => s.dayOfWeek == today).toList()
-          ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+    teacherSchedules.where((s) => s.dayOfWeek == today).toList()
+      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
 
     for (var schedule in todayLessons) {
       final lessonTime = _parseTime(schedule.startTime);
@@ -612,8 +632,8 @@ class TeacherDashboardController extends GetxController {
     final today = getTodayEnum();
 
     final todayLessons =
-        teacherSchedules.where((s) => s.dayOfWeek == today).toList()
-          ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+    teacherSchedules.where((s) => s.dayOfWeek == today).toList()
+      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
 
     for (var schedule in todayLessons) {
       final startTime = _parseTime(schedule.startTime);
@@ -663,6 +683,62 @@ class TeacherDashboardController extends GetxController {
     return schoolClass?.name ?? 'Necunoscut';
   }
 
+  /// Returns the best-known subject name for a given class.
+  ///
+  /// Source of truth: teacher schedule items (they often include subjectName).
+  String? getSubjectNameForClass(String classId) {
+    try {
+      final match = teacherSchedules.firstWhereOrNull(
+            (s) =>
+        s.classId == classId && (s.subjectName
+            ?.trim()
+            .isNotEmpty ?? false),
+      );
+      if (match != null) return match.subjectName;
+
+      // Fallback: any schedule entry for that class
+      final any = teacherSchedules.firstWhereOrNull((s) =>
+      s.classId == classId);
+      return any?.subjectName;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Try to resolve subject_id for attendance/homework actions.
+  ///
+  /// If schedule is present, we can pick the subjectId from it.
+  Future<String?> resolveSubjectIdForClass(String classId) async {
+    // Prefer current/next lesson if it matches the class
+    final current = currentLesson;
+    if (current != null && current.classId == classId) {
+      return current.subjectId;
+    }
+
+    final next = nextLesson;
+    if (next != null && next.classId == classId) {
+      return next.subjectId;
+    }
+
+    final any = teacherSchedules.firstWhereOrNull((s) => s.classId == classId);
+    return any?.subjectId;
+  }
+
+  /// Synchronous helper used by some widgets.
+  ///
+  /// Best-effort: tries to return a subjectId for the class from loaded schedules.
+  /// If none is available yet, returns null.
+  String? getSubjectIdForClass(String classId) {
+    final current = currentLesson;
+    if (current != null && current.classId == classId) return current.subjectId;
+
+    final next = nextLesson;
+    if (next != null && next.classId == classId) return next.subjectId;
+
+    final any = teacherSchedules.firstWhereOrNull((s) => s.classId == classId);
+    return any?.subjectId;
+  }
+
   // ==================== STATISTICS ====================
   int get totalClasses => classes.length;
 
@@ -682,11 +758,11 @@ class TeacherDashboardController extends GetxController {
     return attendanceList
         .where(
           (att) =>
-              att.attendanceDate.year == today.year &&
-              att.attendanceDate.month == today.month &&
-              att.attendanceDate.day == today.day &&
-              att.status == AttendanceStatus.absent,
-        )
+      att.attendanceDate.year == today.year &&
+          att.attendanceDate.month == today.month &&
+          att.attendanceDate.day == today.day &&
+          att.status == AttendanceStatus.absent,
+    )
         .length;
   }
 
@@ -701,7 +777,7 @@ class TeacherDashboardController extends GetxController {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
 
-      // If bulk endpoint available, use it
+      // Build payloads
       final homeworkList = studentIds.map((studentId) {
         final data = Map<String, dynamic>.from(homeworkData);
         data['student_id'] = studentId;
@@ -709,14 +785,36 @@ class TeacherDashboardController extends GetxController {
         return data;
       }).toList();
 
-      await homeworkDataSource.createHomeworkBulk(homeworkList, token);
+      // Try bulk endpoint first; if offline, queue individually so SyncManager can send.
+      int queued = 0;
+      try {
+        await homeworkDataSource.createHomeworkBulk(homeworkList, token);
+      } catch (e) {
+        for (final item in homeworkList) {
+          final res = await offlineHandler.run(
+            opType: OperationType.create,
+            entity: 'homework',
+            payload: Map<String, dynamic>.from(item),
+            remoteCall: () => homeworkDataSource.createHomework(item, token),
+          );
+          if (res == null) queued++;
+        }
+      }
 
-      await fetchClassHomework(homeworkData['class_id']?.toString() ?? '');
-      Get.snackbar(
-        'Succes',
-        'Teme create pentru ${studentIds.length} elevi',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      if (queued == 0) {
+        await fetchClassHomework(homeworkData['class_id']?.toString() ?? '');
+        Get.snackbar(
+          'Succes',
+          'Teme create pentru ${studentIds.length} elevi',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          'Offline',
+          'Temele au fost salvate local ($queued) și vor fi trimise automat când revine serverul.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     } catch (e) {
       Get.snackbar(
         'Eroare',
@@ -732,18 +830,11 @@ class TeacherDashboardController extends GetxController {
     String studentId,
     Map<String, dynamic> attendanceData,
   ) async {
-    print("=== markAttendanceForStudent START ===");
-    print("Student ID: $studentId");
-    print("Input data: $attendanceData");
-
     isLoadingAttendance.value = true;
 
     try {
       final token = await SecureStorageService.getToken();
-      print("Token obtained: ${token != null ? 'YES' : 'NO'}");
-
       if (token == null) {
-        print("No token → exiting");
         Get.snackbar('Eroare', 'Nu există token de autentificare');
         return;
       }
@@ -752,18 +843,16 @@ class TeacherDashboardController extends GetxController {
       data['student_id'] = studentId;
       data['teacher_id'] = data['teacher_id'] ?? teacher.value?.id;
 
-      print("Data după adăugare student/teacher: $data");
-
-      // Verificăm câmpurile obligatorii
-      if (data['subject_id'] == null ||
-          data['subject_id'].toString().trim().isEmpty) {
-        throw Exception("subject_id lipsește sau e gol!");
-      }
-      if (data['attendance_date'] == null) {
-        throw Exception("attendance_date lipsește!");
+      // If subject_id missing, try to resolve from schedule.
+      if (data['subject_id'] == null || data['subject_id'].toString().trim().isEmpty) {
+        final subjectId = getSubjectIdForClass(data['class_id']?.toString() ?? '') ??
+            await resolveSubjectIdForClass(data['class_id']?.toString() ?? '');
+        if (subjectId != null) {
+          data['subject_id'] = subjectId;
+        }
       }
 
-      // Formatăm data foarte explicit
+      // Normalize date
       final dateValue = data['attendance_date'];
       if (dateValue is DateTime) {
         data['attendance_date'] = DateFormat('yyyy-MM-dd').format(dateValue);
@@ -771,31 +860,34 @@ class TeacherDashboardController extends GetxController {
         try {
           final dt = DateTime.parse(dateValue);
           data['attendance_date'] = DateFormat('yyyy-MM-dd').format(dt);
-        } catch (e) {
-          print("Format dată invalid: $dateValue → folosim azi");
-          data['attendance_date'] = DateFormat(
-            'yyyy-MM-dd',
-          ).format(DateTime.now());
+        } catch (_) {
+          data['attendance_date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
         }
+      } else if (dateValue == null) {
+        data['attendance_date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
       }
 
-      print("Date finale trimise către backend:");
-      print(data);
-
-      final response = await attendanceDataSource.createAttendance(data, token);
-
-      print("Răspuns backend: $response");
-
-      Get.snackbar(
-        'Succes',
-        'Prezența a fost înregistrată',
-        backgroundColor: Colors.green[800],
+      final res = await offlineHandler.run(
+        opType: OperationType.create,
+        entity: 'attendance',
+        payload: Map<String, dynamic>.from(data),
+        remoteCall: () => attendanceDataSource.createAttendance(data, token),
       );
-    } catch (e, stack) {
-      print("EROARE la marcarea prezenței:");
-      print(e);
-      print(stack);
 
+      if (res != null) {
+        Get.snackbar(
+          'Succes',
+          'Prezența a fost înregistrată',
+          backgroundColor: Colors.green[800],
+        );
+      } else {
+        Get.snackbar(
+          'Offline',
+          'Prezența a fost salvată local și va fi sincronizată automat.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
       Get.snackbar(
         'Eroare',
         'Nu s-a putut înregistra: ${e.toString().split('\n').first}',
@@ -803,7 +895,6 @@ class TeacherDashboardController extends GetxController {
       );
     } finally {
       isLoadingAttendance.value = false;
-      print("=== markAttendanceForStudent END ===");
     }
   }
 
@@ -815,74 +906,57 @@ class TeacherDashboardController extends GetxController {
       final token = await SecureStorageService.getToken();
       if (token == null) return;
 
-      for (var studentId in studentIds) {
+      int queued = 0;
+      int sent = 0;
+
+      for (final studentId in studentIds) {
         final gradeData = Map<String, dynamic>.from(baseGradeData);
         gradeData['student_id'] = studentId;
         gradeData['teacher_id'] = teacher.value?.id;
-        await gradeDataSource.createGrade(gradeData, token);
+
+        final res = await offlineHandler.run(
+          opType: OperationType.create,
+          entity: 'grade',
+          payload: Map<String, dynamic>.from(gradeData),
+          remoteCall: () => gradeDataSource.createGrade(gradeData, token),
+        );
+
+        if (res == null) {
+          queued++;
+        } else {
+          sent++;
+        }
       }
 
-      if (teacher.value != null) {
+      if (teacher.value != null && sent > 0) {
         await fetchTeacherGrades();
       }
-    } catch (e) {
-      print("Error creating grades: $e");
-      rethrow;
-    }
-  }
 
-  String? getSubjectIdForClass(String classId) {
-    // Find schedule for this class taught by current teacher
-    final schedule = teacherSchedules.firstWhereOrNull(
-      (s) => s.classId == classId,
-    );
-    return schedule?.subjectId;
-  }
-
-  // Get subject name for a specific class
-  String? getSubjectNameForClass(String classId) {
-    final schedule = teacherSchedules.firstWhereOrNull(
-      (s) => s.classId == classId,
-    );
-    return schedule?.subjectName;
-  }
-
-  // Try to resolve subject id for a class; if not present in teacherSchedules, fetch class schedule from server
-  Future<String?> resolveSubjectIdForClass(String classId) async {
-    // Guard: invalid classId
-    if (classId.isEmpty) return null;
-
-    // First try existing cached schedules
-    final existing = getSubjectIdForClass(classId);
-    if (existing != null && existing.isNotEmpty) return existing;
-
-    // If not found, try to fetch the class schedule and look for entries taught by current teacher
-    try {
-      final token = await SecureStorageService.getToken();
-      if (token == null) return null;
-
-      final classSchedules = await scheduleDataSource.getClassSchedule(
-        classId,
-        token,
-      );
-      if (classSchedules.isEmpty) return null;
-
-      // Update local cache with any schedules that are new
-      final newSchedules = classSchedules
-          .where((s) => !teacherSchedules.any((ts) => ts.id == s.id))
-          .toList();
-      if (newSchedules.isNotEmpty) {
-        teacherSchedules.addAll(newSchedules);
+      if (queued > 0 && sent == 0) {
+        Get.snackbar(
+          'Offline',
+          'Notele au fost salvate local ($queued) și vor fi trimise automat.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else if (queued > 0 && sent > 0) {
+        Get.snackbar(
+          'Parțial',
+          'Trimise: $sent, salvate offline: $queued. Se vor sincroniza când revine serverul.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          'Succes',
+          'Note create cu succes!',
+          snackPosition: SnackPosition.BOTTOM,
+        );
       }
-
-      // Find schedule from this teacher
-      final match = classSchedules.firstWhereOrNull(
-        (s) => s.teacherId == teacher.value?.id,
-      );
-      return match?.subjectId;
     } catch (e) {
-      print('Error resolving subject for class $classId: $e');
-      return null;
+      Get.snackbar(
+        'Eroare',
+        'Eroare la crearea notelor: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 }

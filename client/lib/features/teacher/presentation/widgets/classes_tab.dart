@@ -241,14 +241,30 @@ class _ClassesTabState extends State<ClassesTab> {
                           color: Colors.white,
                         ),
                       ),
-                      Text(
-                        'Materia: ${widget.controller.teacher.value?.subject ?? "Nespecificată"}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blueAccent.withOpacity(0.8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      // Subject (resolve per-class from schedule instead of teacher.subject)
+                      Obx(() {
+                        final subjectName =
+                            widget.controller.getSubjectNameForClass(
+                          schoolClass.id,
+                        );
+
+                        // If schedules are still loading, show a nicer placeholder.
+                        final display = (subjectName != null &&
+                                subjectName.trim().isNotEmpty)
+                            ? subjectName
+                            : (widget.controller.isLoadingSchedule.value
+                                ? 'Se încarcă…'
+                                : 'Nespecificată');
+
+                        return Text(
+                          'Materia: $display',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blueAccent.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),

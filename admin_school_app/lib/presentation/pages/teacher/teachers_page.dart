@@ -66,16 +66,21 @@ class TeachersPage extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: isMobile
                       ? ListView.builder(
-                    itemCount: controller.teachers.length,
-                    itemBuilder: (context, index) {
-                      final teacher = controller.teachers[index];
-                      return _buildMobileCard(controller, teacher);
-                    },
-                  )
-                      : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: _buildDataTable(controller),
-                  ),
+                          itemCount: controller.teachers.length,
+                          itemBuilder: (context, index) {
+                            final teacher = controller.teachers[index];
+                            return _buildMobileCard(controller, teacher);
+                          },
+                        )
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _buildDataTable(controller),
+                            ),
+                          ),
+                        ),
                 ),
               );
             }),
@@ -126,6 +131,10 @@ class TeachersPage extends StatelessWidget {
   }
 
   Widget _buildMobileCard(TeachersController controller, teacher) {
+    final username = teacher.user?.username ?? '-';
+    final schoolName = teacher.schoolName ?? controller.schoolNameFor(teacher.schoolId);
+    final subject = (teacher.subject ?? '').trim().isEmpty ? '-' : (teacher.subject ?? '-');
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       color: const Color(0xFF1A1F3A),
@@ -135,25 +144,25 @@ class TeachersPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('User ID: ${teacher.userId}',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
+            Text(
+              username,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('ID: ${teacher.id ?? "-"}',
+            Text('Școală: $schoolName',
                 style: TextStyle(color: Colors.white.withOpacity(0.7))),
-            Text('Școală ID: ${teacher.schoolId ?? "-"}',
-                style: TextStyle(color: Colors.white.withOpacity(0.7))),
-            Text('Specializare: ${teacher.specialization ?? "-"}',
+            Text('Specializări: $subject',
                 style: TextStyle(color: Colors.white.withOpacity(0.7))),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () =>
-                        Get.to(() => TeacherFormPage(teacherId: teacher.id)),
+                    onPressed: () => Get.to(() => TeacherFormPage(teacherId: teacher.userId)),
                     icon: const Icon(Icons.edit, size: 16),
                     label: const Text('Editează'),
                     style: ElevatedButton.styleFrom(
@@ -166,7 +175,7 @@ class TeachersPage extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _showDeleteDialog(controller, teacher.id!),
+                    onPressed: () => _showDeleteDialog(controller, teacher.userId),
                     icon: const Icon(Icons.delete, size: 16),
                     label: const Text('Șterge'),
                     style: ElevatedButton.styleFrom(
@@ -194,29 +203,30 @@ class TeachersPage extends StatelessWidget {
           color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
       dataTextStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
       columns: const [
-        DataColumn(label: Text('ID')),
-        DataColumn(label: Text('User ID')),
-        DataColumn(label: Text('Școală ID')),
-        DataColumn(label: Text('Specializare')),
+        DataColumn(label: Text('Username')),
+        DataColumn(label: Text('Școală')),
+        DataColumn(label: Text('Specializări')),
         DataColumn(label: Text('Acțiuni')),
       ],
       rows: controller.teachers.map((teacher) {
+        final username = teacher.user?.username ?? '-';
+        final schoolName = teacher.schoolName ?? controller.schoolNameFor(teacher.schoolId);
+        final subject = (teacher.subject ?? '').trim().isEmpty ? '-' : (teacher.subject ?? '-');
+
         return DataRow(cells: [
-          DataCell(Text(teacher.id ?? '-')),
-          DataCell(Text(teacher.userId.toString())),
-          DataCell(Text(teacher.schoolId.toString())),
-          DataCell(Text(teacher.specialization ?? '-')),
+          DataCell(Text(username)),
+          DataCell(Text(schoolName)),
+          DataCell(Text(subject)),
           DataCell(Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.white),
-                onPressed: () =>
-                    Get.to(() => TeacherFormPage(teacherId: teacher.id)),
+                onPressed: () => Get.to(() => TeacherFormPage(teacherId: teacher.userId)),
               ),
               IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _showDeleteDialog(controller, teacher.id!),
+                onPressed: () => _showDeleteDialog(controller, teacher.userId),
               ),
             ],
           )),
@@ -288,7 +298,7 @@ class TeachersPage extends StatelessWidget {
     );
   }
 
-  void _showDeleteDialog(TeachersController controller, String teacherId) {
+  void _showDeleteDialog(TeachersController controller, String teacherUserId) {
     Get.dialog(
       Dialog(
         backgroundColor: Colors.transparent,
@@ -342,7 +352,7 @@ class TeachersPage extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         Get.back();
-                        controller.deleteTeacher(teacherId);
+                        controller.deleteTeacher(teacherUserId);
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),

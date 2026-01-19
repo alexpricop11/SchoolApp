@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../../../domain/entities/class_entity.dart';
 import '../../../domain/usecases/class/get_classes_usecase.dart';
 import '../../../domain/usecases/class/delete_class_usecase.dart';
+import '../../../core/database/db_error_mapper.dart';
 import 'package:get_it/get_it.dart';
 
 class ClassesController extends GetxController {
@@ -26,7 +27,7 @@ class ClassesController extends GetxController {
       final result = await getClassesUseCase();
       classes.value = result;
     } catch (e) {
-      errorMessage.value = 'Eroare la încărcarea claselor: $e';
+      errorMessage.value = DbErrorMapper.toUserMessage(e is Object ? e : Exception('Unknown error'));
     } finally {
       isLoading.value = false;
     }

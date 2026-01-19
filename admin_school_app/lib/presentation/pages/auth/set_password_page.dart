@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_it/get_it.dart';
 import '../../../core/ui/input_decorations.dart' as ui_decorations;
 import '../../controllers/auth/password_controller.dart';
 import 'login_page.dart';

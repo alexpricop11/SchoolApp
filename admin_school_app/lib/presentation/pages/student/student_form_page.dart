@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/student/student_form_controller.dart';
+import '../../widgets/searchable_id_dropdown_field.dart';
 
 class StudentFormPage extends StatelessWidget {
   final String? studentId;
@@ -26,16 +27,47 @@ class StudentFormPage extends StatelessWidget {
           child: Column(
             children: [
               TextField(
-                controller: controller.userIdController,
-                decoration: const InputDecoration(labelText: 'ID Utilizator *', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
+                controller: controller.usernameController,
+                decoration: const InputDecoration(labelText: 'Username *', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16),
               TextField(
-                controller: controller.classIdController,
-                decoration: const InputDecoration(labelText: 'ID Clasă *', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
+                controller: controller.emailController,
+                decoration: const InputDecoration(labelText: 'Email *', border: OutlineInputBorder()),
+                keyboardType: TextInputType.emailAddress,
               ),
+              const SizedBox(height: 16),
+              Obx(() {
+                if (controller.schoolOptions.isEmpty) {
+                  return TextField(
+                    controller: controller.schoolIdController,
+                    decoration: const InputDecoration(labelText: 'Școală *', border: OutlineInputBorder()),
+                  );
+                }
+                return SearchableIdDropdownField(
+                  label: 'Școală',
+                  isRequired: true,
+                  value: controller.schoolIdController.text,
+                  options: controller.schoolOptions,
+                  onChanged: controller.setSelectedSchoolId,
+                );
+              }),
+              const SizedBox(height: 16),
+              Obx(() {
+                if (controller.classOptions.isEmpty) {
+                  return TextField(
+                    controller: controller.classIdController,
+                    decoration: const InputDecoration(labelText: 'Clasă *', border: OutlineInputBorder()),
+                  );
+                }
+                return SearchableIdDropdownField(
+                  label: 'Clasă',
+                  isRequired: true,
+                  value: controller.classIdController.text,
+                  options: controller.classOptions,
+                  onChanged: controller.setSelectedClassId,
+                );
+              }),
               const SizedBox(height: 24),
               if (controller.errorMessage.isNotEmpty)
                 Padding(

@@ -8,6 +8,7 @@ import '../../domain/usecases/check_email_usecase.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../config/app_config.dart';
 import '../network/auth_interceptor.dart';
+import '../../core/database/database_connection_manager.dart';
 
 // Schools
 import '../../data/data_sources/school_data_source.dart';
@@ -88,7 +89,7 @@ Future<void> initDependencies() async {
 
   // Auth
   sl.registerLazySingleton<AuthRemoteDataSource>(
-    () => AuthRemoteDataSourceImpl(sl<Dio>()),
+    () => AuthRemoteDataSourceImpl(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(sl<AuthRemoteDataSource>()),
@@ -96,9 +97,25 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton(() => CheckEmailUseCase(sl<AuthRepository>()));
   sl.registerLazySingleton(() => LoginUseCase(sl<AuthRepository>()));
 
+  // Database (direct PostgreSQL)
+  sl.registerLazySingleton<DatabaseConnectionManager>(
+    () {
+      final mgr = DatabaseConnectionManager();
+      mgr.configure(
+        host: AppConfig.dbHost,
+        port: AppConfig.dbPort,
+        database: AppConfig.dbName,
+        username: AppConfig.dbUser,
+        password: AppConfig.dbPassword,
+        useSSL: AppConfig.dbUseSSL,
+      );
+      return mgr;
+    },
+  );
+
   // Schools
   sl.registerLazySingleton<SchoolDataSource>(
-    () => SchoolDataSource(sl<Dio>()),
+    () => SchoolDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<SchoolRepository>(
     () => SchoolRepositoryImpl(sl<SchoolDataSource>()),
@@ -111,7 +128,7 @@ Future<void> initDependencies() async {
 
   // Classes
   sl.registerLazySingleton<ClassDataSource>(
-    () => ClassDataSource(sl<Dio>()),
+    () => ClassDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<ClassRepository>(
     () => ClassRepositoryImpl(sl<ClassDataSource>()),
@@ -124,7 +141,7 @@ Future<void> initDependencies() async {
 
   // Teachers
   sl.registerLazySingleton<TeacherDataSource>(
-    () => TeacherDataSource(sl<Dio>()),
+    () => TeacherDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<TeacherRepository>(
     () => TeacherRepositoryImpl(sl<TeacherDataSource>()),
@@ -137,7 +154,7 @@ Future<void> initDependencies() async {
 
   // Students
   sl.registerLazySingleton<StudentDataSource>(
-    () => StudentDataSource(sl<Dio>()),
+    () => StudentDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<StudentRepository>(
     () => StudentRepositoryImpl(sl<StudentDataSource>()),
@@ -150,7 +167,7 @@ Future<void> initDependencies() async {
 
   // Admin Users
   sl.registerLazySingleton<AdminUserDataSource>(
-    () => AdminUserDataSource(sl<Dio>()),
+    () => AdminUserDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<AdminUserRepository>(
     () => AdminUserRepositoryImpl(sl<AdminUserDataSource>()),
@@ -163,7 +180,7 @@ Future<void> initDependencies() async {
 
   // Dashboard
   sl.registerLazySingleton<DashboardDataSource>(
-    () => DashboardDataSource(sl<Dio>()),
+    () => DashboardDataSource(sl<Dio>(), sl<DatabaseConnectionManager>()),
   );
   sl.registerLazySingleton<DashboardRepository>(
     () => DashboardRepositoryImpl(sl<DashboardDataSource>()),

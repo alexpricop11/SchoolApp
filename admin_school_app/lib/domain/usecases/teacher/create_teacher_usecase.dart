@@ -1,4 +1,5 @@
 import '../../entities/teacher_entity.dart';
+import '../../entities/teacher_upsert_entity.dart';
 import '../../repositories/teacher_repository.dart';
 
 class CreateTeacherUseCase {
@@ -6,7 +7,7 @@ class CreateTeacherUseCase {
 
   CreateTeacherUseCase(this.repository);
 
-  Future<TeacherEntity?> call(TeacherEntity teacher) async {
+  Future<TeacherEntity?> call(TeacherUpsertEntity teacher) async {
     return await repository.createTeacher(teacher);
   }
 }

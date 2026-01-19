@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/class/class_form_controller.dart';
+import '../../widgets/searchable_id_dropdown_field.dart';
 
 class ClassFormPage extends StatelessWidget {
   final String? classId;
@@ -30,23 +31,38 @@ class ClassFormPage extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Nume Clasă *', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: controller.gradeIdController,
-                decoration: const InputDecoration(labelText: 'ID Grad *', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
-              ),
+              Obx(() {
+                if (controller.schoolOptions.isEmpty) {
+                  return TextField(
+                    controller: controller.schoolIdController,
+                    decoration: const InputDecoration(labelText: 'Școală *', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.text,
+                  );
+                }
+                return SearchableIdDropdownField(
+                  label: 'Școală',
+                  isRequired: true,
+                  value: controller.schoolIdController.text,
+                  options: controller.schoolOptions,
+                  onChanged: controller.setSelectedSchoolId,
+                );
+              }),
               const SizedBox(height: 16),
-              TextField(
-                controller: controller.schoolIdController,
-                decoration: const InputDecoration(labelText: 'ID Școală *', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller.teacherIdController,
-                decoration: const InputDecoration(labelText: 'ID Profesor', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
-              ),
+              Obx(() {
+                if (controller.teacherOptions.isEmpty) {
+                  return TextField(
+                    controller: controller.teacherIdController,
+                    decoration: const InputDecoration(labelText: 'Profesor (opțional)', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.text,
+                  );
+                }
+                return SearchableIdDropdownField(
+                  label: 'Profesor (opțional)',
+                  value: controller.teacherIdController.text,
+                  options: controller.teacherOptions,
+                  onChanged: controller.setSelectedTeacherId,
+                );
+              }),
               const SizedBox(height: 24),
               if (controller.errorMessage.isNotEmpty)
                 Padding(

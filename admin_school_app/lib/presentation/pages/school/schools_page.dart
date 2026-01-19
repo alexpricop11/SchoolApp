@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../controllers/school/schools_controller.dart';
 import '../../widgets/main_layout.dart';
 import 'school_form_page.dart';
+import '../settings/settings_page.dart';
 
 class SchoolsPage extends StatelessWidget {
   const SchoolsPage({super.key});
@@ -291,15 +292,32 @@ class SchoolsPage extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: controller.loadSchools,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reîncearcă'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: controller.loadSchools,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reîncearcă'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Get.to(() => const SettingsPage()),
+                icon: const Icon(Icons.settings),
+                label: const Text('Setări DB'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A1F3A),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -36,7 +36,35 @@ dependencies:
   cupertino_icons: ^1.0.8
   fl_chart: ^0.68.0
 
-dev_dependencies:
+  # State management & DI
+  get: ^4.7.2
+  get_it: ^9.0.5
+
+  # Networking
+  dio: ^5.9.0
+
+  # Security
+  flutter_secure_storage: ^9.2.4
+
+  # Localization
+  intl: ^0.20.2
+
+  # Local caching
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # UUID generation
+  uuid: ^4.0.0
+
+  # Database direct access
+  postgres: ^3.0.0
+
+  # Connectivity
+  connectivity_plus: ^6.0.0
+  internet_connection_checker_plus: ^2.5.2
+  crypto: ^3.0.7
+
+ndev_dependencies:
   flutter_test:
     sdk: flutter
 
@@ -46,11 +74,6 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
-  get: ^4.7.2
-  get_it: ^9.0.5
-  dio: ^5.9.0
-  flutter_secure_storage: ^9.2.4
-  intl: ^0.20.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

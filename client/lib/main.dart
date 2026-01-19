@@ -10,6 +10,7 @@ import 'features/auth/domain/entities/USER_ROLE.dart';
 import 'features/student/presentation/pages/student_dashboard_page.dart';
 import 'features/teacher/presentation/pages/teacher_page.dart';
 import 'welcome_page.dart';
+import 'core/widgets/connection_status_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +68,16 @@ class MyApp extends StatelessWidget {
       translations: AppTranslations(),
       locale: Locale(initialLocaleCode),
       fallbackLocale: const Locale('en', 'US'),
-      home: initialPage,
+      home: Stack(
+        children: [
+          initialPage,
+          // Global connection banner
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConnectionStatusBar(),
+          ),
+        ],
+      ),
       theme: ThemeData(
         brightness: Brightness.light,
         primarySwatch: Colors.blue,

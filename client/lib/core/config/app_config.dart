@@ -11,9 +11,9 @@ class AppConfig {
   // Get the current base URL based on environment
   static String get baseUrl => devBaseUrl;
 
-  // API timeouts
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  // API timeouts (keep small so app can fallback to cache quickly)
+  static const Duration connectTimeout = Duration(seconds: 4);
+  static const Duration receiveTimeout = Duration(seconds: 6);
 
   // Token refresh threshold (refresh token when less than this time remains)
   static const Duration tokenRefreshThreshold = Duration(minutes: 5);

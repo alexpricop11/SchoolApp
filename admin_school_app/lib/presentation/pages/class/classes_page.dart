@@ -72,9 +72,14 @@ class ClassesPage extends StatelessWidget {
                             return _buildMobileCard(controller, classEntity);
                           },
                         )
-                      : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _buildDataTable(controller),
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _buildDataTable(controller),
+                            ),
+                          ),
                         ),
                 ),
               );
@@ -157,17 +162,14 @@ class ClassesPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'ID: ${classEntity.id ?? "-"}',
+              'Școală: ${classEntity.schoolId ?? "-"}',
               style: TextStyle(color: Colors.white.withOpacity(0.7)),
             ),
-            Text(
-              'Școală ID: ${classEntity.schoolId ?? "-"}',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
-            ),
-            Text(
-              'Grad ID: ${classEntity.gradeId ?? "-"}',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
-            ),
+            if ((classEntity.teacherId ?? '').toString().isNotEmpty)
+              Text(
+                'Profesor: ${classEntity.teacherId ?? "-"}',
+                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -227,19 +229,17 @@ class ClassesPage extends StatelessWidget {
         fontSize: 14,
       ),
       columns: const [
-        DataColumn(label: Text('ID')),
         DataColumn(label: Text('Nume')),
-        DataColumn(label: Text('Școală ID')),
-        DataColumn(label: Text('Grad ID')),
+        DataColumn(label: Text('Școală')),
+        DataColumn(label: Text('Profesor')),
         DataColumn(label: Text('Acțiuni')),
       ],
       rows: controller.classes.map((classEntity) {
         return DataRow(
           cells: [
-            DataCell(Text(classEntity.id ?? '-')),
             DataCell(Text(classEntity.name)),
-            DataCell(Text(classEntity.schoolId ?? '-')),
-            DataCell(Text(classEntity.gradeId ?? '-')),
+            DataCell(Text(classEntity.schoolId)),
+            DataCell(Text((classEntity.teacherId ?? '').isEmpty ? '-' : classEntity.teacherId ?? '-')),
             DataCell(
               Row(
                 mainAxisSize: MainAxisSize.min,

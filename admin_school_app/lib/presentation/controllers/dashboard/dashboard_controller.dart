@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:get_it/get_it.dart';
 import '../../../domain/entities/dashboard_stats_entity.dart';
 import '../../../domain/usecases/dashboard/get_dashboard_stats_usecase.dart';
+import '../../../core/network/network_fallback.dart';
 
 class DashboardController extends GetxController {
   final GetDashboardStatsUseCase getDashboardStatsUseCase =
@@ -31,7 +32,8 @@ class DashboardController extends GetxController {
     } catch (e) {
       isLoading.value = false;
       hasError.value = true;
-      errorMessage.value = 'Eroare la încărcarea statisticilor: ${e.toString()}';
+      errorMessage.value =
+          'Eroare la încărcarea statisticilor: ${NetworkFallback.describe(e is Object ? e : Exception('Unknown error'))}';
     }
   }
 

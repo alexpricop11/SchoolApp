@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../domain/entities/teacher_entity.dart';
+import '../../../domain/entities/teacher_upsert_entity.dart';
 import '../../../domain/usecases/teacher/create_teacher_usecase.dart';
 import '../../../domain/usecases/teacher/update_teacher_usecase.dart';
 import '../../../domain/usecases/teacher/get_teacher_usecase.dart';
+import '../../../domain/usecases/school/get_schools_usecase.dart';
+import '../../../domain/usecases/class/get_classes_usecase.dart';
+import '../../widgets/id_dropdown_field.dart';
 import 'package:get_it/get_it.dart';
 
 class TeacherFormController extends GetxController {
@@ -13,10 +16,23 @@ class TeacherFormController extends GetxController {
       .get<UpdateTeacherUseCase>();
   final GetTeacherUseCase getTeacherUseCase = GetIt.instance
       .get<GetTeacherUseCase>();
+  final GetSchoolsUseCase getSchoolsUseCase = GetIt.instance
+      .get<GetSchoolsUseCase>();
+  final GetClassesUseCase getClassesUseCase = GetIt.instance
+      .get<GetClassesUseCase>();
 
-  final userIdController = TextEditingController();
+  final usernameController = TextEditingController();
+  final emailController = TextEditingController();
+  final subjectController = TextEditingController();
   final schoolIdController = TextEditingController();
-  final specializationController = TextEditingController();
+  final classIdController = TextEditingController();
+
+  final schoolOptions = <IdDropdownOption>[].obs;
+  final classOptions = <IdDropdownOption>[].obs;
+  final isLoadingLookups = false.obs;
+
+  var isDirector = false.obs;
+  var isHomeroom = false.obs;
 
   var isLoading = false.obs;
   var errorMessage = ''.obs;
@@ -28,10 +44,40 @@ class TeacherFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadLookups();
     if (teacherId != null) {
       isEditMode.value = true;
       loadTeacher();
     }
+  }
+
+  Future<void> _loadLookups() async {
+    isLoadingLookups.value = true;
+    try {
+      final schools = await getSchoolsUseCase();
+      schoolOptions.value = schools
+          .where((s) => s.id != null)
+          .map((s) => IdDropdownOption(id: s.id!, label: s.name))
+          .toList();
+
+      final classes = await getClassesUseCase();
+      classOptions.value = classes
+          .where((c) => c.id != null)
+          .map((c) => IdDropdownOption(id: c.id!, label: c.name))
+          .toList();
+    } catch (_) {
+      // keep empty; user can still paste IDs
+    } finally {
+      isLoadingLookups.value = false;
+    }
+  }
+
+  void setSelectedSchoolId(String? id) {
+    schoolIdController.text = id ?? '';
+  }
+
+  void setSelectedClassId(String? id) {
+    classIdController.text = id ?? '';
   }
 
   Future<void> loadTeacher() async {
@@ -41,9 +87,13 @@ class TeacherFormController extends GetxController {
     try {
       final teacher = await getTeacherUseCase(teacherId!);
       if (teacher != null) {
-        userIdController.text = teacher.userId.toString();
-        schoolIdController.text = teacher.schoolId.toString();
-        specializationController.text = teacher.specialization ?? '';
+        usernameController.text = teacher.user?.username ?? '';
+        emailController.text = teacher.user?.email ?? '';
+        subjectController.text = teacher.subject ?? '';
+        schoolIdController.text = teacher.schoolId ?? teacher.user?.schoolId ?? '';
+        classIdController.text = teacher.classId ?? '';
+        isDirector.value = teacher.isDirector;
+        isHomeroom.value = teacher.isHomeroom;
       }
     } catch (e) {
       errorMessage.value = 'Eroare la încărcarea profesorului: $e';
@@ -53,41 +103,37 @@ class TeacherFormController extends GetxController {
   }
 
   Future<void> saveTeacher() async {
-    if (userIdController.text.trim().isEmpty) {
-      errorMessage.value = 'Introduceți ID-ul utilizatorului';
+    if (usernameController.text.trim().isEmpty) {
+      errorMessage.value = 'Introduceți username-ul';
       return;
     }
-    if (schoolIdController.text.trim().isEmpty) {
-      errorMessage.value = 'Introduceți ID-ul școlii';
+    if (emailController.text.trim().isEmpty) {
+      errorMessage.value = 'Introduceți email-ul';
       return;
     }
 
     isLoading.value = true;
     errorMessage.value = '';
 
-    final teacher = TeacherEntity(
-      id: teacherId,
-      userId: userIdController.text.trim(),
-      schoolId: schoolIdController.text.trim(),
-      specialization: specializationController.text.trim(),
+    final teacher = TeacherUpsertEntity(
+      userId: teacherId,
+      username: usernameController.text.trim(),
+      email: emailController.text.trim(),
+      subject: subjectController.text.trim().isEmpty ? null : subjectController.text.trim(),
+      isDirector: isDirector.value,
+      isHomeroom: isHomeroom.value,
+      classId: classIdController.text.trim().isEmpty ? null : classIdController.text.trim(),
+      schoolId: schoolIdController.text.trim().isEmpty ? null : schoolIdController.text.trim(),
     );
 
     try {
-      TeacherEntity? result;
-      if (isEditMode.value && teacherId != null) {
-        result = await updateTeacherUseCase(teacherId!, teacher);
-      } else {
-        result = await createTeacherUseCase(teacher);
-      }
+      final result = (isEditMode.value && teacherId != null)
+          ? await updateTeacherUseCase(teacherId!, teacher)
+          : await createTeacherUseCase(teacher);
 
       if (result != null) {
         Get.back(result: true);
-        Get.snackbar(
-          'Succes',
-          isEditMode.value
-              ? 'Profesorul a fost actualizat'
-              : 'Profesorul a fost creat',
-        );
+        Get.snackbar('Succes', isEditMode.value ? 'Profesorul a fost actualizat' : 'Profesorul a fost creat');
       } else {
         errorMessage.value = 'Eroare la salvarea profesorului';
       }
@@ -100,9 +146,11 @@ class TeacherFormController extends GetxController {
 
   @override
   void onClose() {
-    userIdController.dispose();
+    usernameController.dispose();
+    emailController.dispose();
+    subjectController.dispose();
     schoolIdController.dispose();
-    specializationController.dispose();
+    classIdController.dispose();
     super.onClose();
   }
 }

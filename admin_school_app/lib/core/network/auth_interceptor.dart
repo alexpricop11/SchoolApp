@@ -4,6 +4,7 @@ import 'package:get/get.dart' as getx;
 import '../services/secure_storage_service.dart';
 import '../config/app_config.dart';
 import '../../presentation/pages/auth/login_page.dart';
+import 'api_health_service.dart';
 
 class AuthInterceptor extends Interceptor {
   bool _isRefreshing = false;
@@ -30,11 +31,28 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    // Any successful response means API is up.
+    ApiHealthService.markUp();
+    handler.next(response);
+  }
+
+  @override
   Future<void> onError(
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
     debugPrint('>>> Error: ${err.response?.statusCode} on ${err.requestOptions.path}');
+
+    // Speed up future requests: mark API down on connection-level failures.
+    if (err.type == DioExceptionType.connectionError ||
+        err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.sendTimeout ||
+        err.type == DioExceptionType.unknown ||
+        err.response == null) {
+      ApiHealthService.markDown();
+    }
 
     // Check if error is 401 Unauthorized (token expired or invalid)
     if (err.response?.statusCode == 401 && !_isRefreshing) {

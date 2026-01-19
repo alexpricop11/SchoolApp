@@ -4,17 +4,23 @@ import '../../../domain/entities/admin_user_entity.dart';
 import '../../../domain/usecases/admin_user/create_user_usecase.dart';
 import '../../../domain/usecases/admin_user/update_user_usecase.dart';
 import '../../../domain/usecases/admin_user/get_user_usecase.dart';
+import '../../../domain/usecases/school/get_schools_usecase.dart';
+import '../../widgets/id_dropdown_field.dart';
 import 'package:get_it/get_it.dart';
 
 class AdminUserFormController extends GetxController {
   final CreateUserUseCase createUserUseCase = GetIt.instance.get<CreateUserUseCase>();
   final UpdateUserUseCase updateUserUseCase = GetIt.instance.get<UpdateUserUseCase>();
   final GetUserUseCase getUserUseCase = GetIt.instance.get<GetUserUseCase>();
+  final GetSchoolsUseCase getSchoolsUseCase = GetIt.instance.get<GetSchoolsUseCase>();
 
   final usernameController = TextEditingController();
   final emailController = TextEditingController();
   final roleController = TextEditingController();
   final schoolIdController = TextEditingController();
+
+  final schoolOptions = <IdDropdownOption>[].obs;
+  final isLoadingLookups = false.obs;
 
   var isLoading = false.obs;
   var errorMessage = ''.obs;
@@ -27,10 +33,30 @@ class AdminUserFormController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadLookups();
     if (userId != null) {
       isEditMode.value = true;
       loadUser();
     }
+  }
+
+  Future<void> _loadLookups() async {
+    isLoadingLookups.value = true;
+    try {
+      final schools = await getSchoolsUseCase();
+      schoolOptions.value = schools
+          .where((s) => s.id != null)
+          .map((s) => IdDropdownOption(id: s.id!, label: s.name))
+          .toList();
+    } catch (_) {
+      // ignore
+    } finally {
+      isLoadingLookups.value = false;
+    }
+  }
+
+  void setSelectedSchoolId(String? id) {
+    schoolIdController.text = id ?? '';
   }
 
   Future<void> loadUser() async {

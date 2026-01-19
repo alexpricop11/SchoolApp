@@ -15,23 +15,37 @@ class SchoolModel extends SchoolEntity {
     super.updatedAt,
   });
 
+  static String? _asString(dynamic v) {
+    if (v == null) return null;
+    try {
+      return v.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static DateTime? _parseDate(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
+    return null;
+  }
+
   factory SchoolModel.fromJson(Map<String, dynamic> json) {
     return SchoolModel(
       id: json['id']?.toString(),
-      name: json['name'] as String,
-      location: json['location'] as String?,
-      phone: json['phone'] as String?,
-      email: json['email'] as String?,
-      website: json['website'] as String?,
-      logoUrl: json['logo_url'] as String?,
-      establishedYear: json['established_year'] as int?,
+      name: (json['name'] ?? '').toString(),
+      location: _asString(json['location']),
+      phone: _asString(json['phone']),
+      email: _asString(json['email']),
+      website: _asString(json['website']),
+      logoUrl: _asString(json['logo_url']),
+      establishedYear: json['established_year'] is int
+          ? json['established_year'] as int
+          : int.tryParse(json['established_year']?.toString() ?? ''),
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
+      createdAt: _parseDate(json['created_at']),
+      updatedAt: _parseDate(json['updated_at']),
     );
   }
 

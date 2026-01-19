@@ -1,4 +1,5 @@
 import '../../domain/entities/student_entity.dart';
+import '../../domain/entities/student_upsert_entity.dart';
 import '../../domain/repositories/student_repository.dart';
 import '../data_sources/student_data_source.dart';
 import '../models/student_model.dart';
@@ -19,23 +20,32 @@ class StudentRepositoryImpl implements StudentRepository {
   }
 
   @override
-  Future<StudentEntity?> createStudent(StudentEntity student) async {
+  Future<StudentEntity?> createStudent(StudentUpsertEntity student) async {
     final model = StudentModel(
-      id: student.id,
-      userId: student.userId,
+      userId: student.userId ?? '',
       classId: student.classId,
     );
-    return await dataSource.createStudent(model);
+    return await dataSource.createStudent(
+      model,
+      username: student.username,
+      email: student.email,
+      schoolId: student.schoolId,
+    );
   }
 
   @override
-  Future<StudentEntity?> updateStudent(String studentId, StudentEntity student) async {
+  Future<StudentEntity?> updateStudent(String studentId, StudentUpsertEntity student) async {
     final model = StudentModel(
-      id: student.id,
-      userId: student.userId,
+      userId: student.userId ?? studentId,
       classId: student.classId,
     );
-    return await dataSource.updateStudent(studentId, model);
+    return await dataSource.updateStudent(
+      studentId,
+      model,
+      username: student.username,
+      email: student.email,
+      schoolId: student.schoolId,
+    );
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../../../domain/entities/school_entity.dart';
 import '../../../domain/usecases/school/get_schools_usecase.dart';
 import '../../../domain/usecases/school/delete_school_usecase.dart';
+import '../../../core/database/db_error_mapper.dart';
 import 'package:get_it/get_it.dart';
 
 class SchoolsController extends GetxController {
@@ -26,7 +27,7 @@ class SchoolsController extends GetxController {
       final result = await getSchoolsUseCase();
       schools.value = result;
     } catch (e) {
-      errorMessage.value = 'Eroare la încărcarea școlilor: $e';
+      errorMessage.value = DbErrorMapper.toUserMessage(e is Object ? e : Exception('Unknown error'));
     } finally {
       isLoading.value = false;
     }

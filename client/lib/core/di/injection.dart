@@ -40,6 +40,11 @@ import '../../features/auth/data/repositories/password_repositories_impl.dart';
 import '../../features/auth/domain/repositories/password_repositories.dart';
 import '../../features/auth/domain/usecases/send_reset_code_usecase.dart';
 import '../../features/auth/presentation/controllers/password_controller.dart';
+import '../network/connectivity_manager.dart';
+import '../sync/sync_queue.dart';
+import '../sync/sync_manager.dart';
+import '../network/api_health_service.dart';
+import '../offline/offline_action_handler.dart';
 
 final sl = GetIt.instance;
 
@@ -59,7 +64,28 @@ Future<void> initDependencies() async {
   dio.interceptors.add(
     InterceptorsWrapper(
       onError: (error, handler) async {
-        debugPrint('>>> DI Dio Error: ${error.response?.statusCode} on ${error.requestOptions.path}');
+        final path = error.requestOptions.path;
+
+        // Reduce console noise for non-app endpoints/tooling
+        // (health checks, docs, and openapi are often polled and can spam logs when offline)
+        const noisyPaths = ['/health', '/openapi.json', '/docs'];
+        final isNoisy = noisyPaths.any((p) => path.contains(p));
+
+        if (!isNoisy) {
+          debugPrint(
+            '>>> DI Dio Error: ${error.response?.statusCode} on ${error.requestOptions.path}',
+          );
+        }
+
+        // Mark API down on connection-level failures (helps offline-first fallback)
+        if (error.type == DioExceptionType.connectionError ||
+            error.type == DioExceptionType.connectionTimeout ||
+            error.type == DioExceptionType.receiveTimeout ||
+            error.type == DioExceptionType.sendTimeout ||
+            error.type == DioExceptionType.unknown ||
+            error.response == null) {
+          ApiHealthService.markDown();
+        }
 
         if (error.response?.statusCode == 401) {
           // Try to refresh token
@@ -83,10 +109,26 @@ Future<void> initDependencies() async {
         }
         return handler.next(error);
       },
+      onResponse: (response, handler) {
+        ApiHealthService.markUp();
+        handler.next(response);
+      },
     ),
   );
 
   sl.registerLazySingleton<Dio>(() => dio);
+
+  // -------------------- OFFLINE-FIRST CORE --------------------
+  sl.registerLazySingleton<ConnectivityManager>(
+    () => ConnectivityManager(dio: sl<Dio>()),
+  );
+  sl.registerLazySingleton<SyncQueue>(() => SyncQueue());
+  sl.registerLazySingleton<SyncManager>(
+    () => SyncManager(queue: sl<SyncQueue>(), connectivity: sl<ConnectivityManager>(), dio: sl<Dio>()),
+  );
+
+  // Start background-ish sync loop (in foreground) & connectivity monitoring.
+  await sl<SyncManager>().start();
 
   sl.registerLazySingleton<StudentRemoteDataSource>(
     () => StudentRemoteDataSourceImpl(sl<Dio>()),
@@ -208,6 +250,10 @@ Future<void> initDependencies() async {
 
   // Teacher Controller
   sl.registerFactory(() => TeacherDashboardController());
+
+  sl.registerLazySingleton<OfflineActionHandler>(
+    () => OfflineActionHandler(connectivity: sl<ConnectivityManager>(), queue: sl<SyncQueue>()),
+  );
 }
 
 Future<bool> _tryRefreshToken(Dio dio) async {
