@@ -1,5 +1,5 @@
 import uuid
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 
 from app.homework.models import Homework
@@ -25,6 +25,9 @@ class HomeworkService:
 
     async def get_class_homework(self, class_id: uuid.UUID) -> List[Homework]:
         return await self.repository.get_by_class(class_id)
+
+    async def get_student_homework(self, student_id: uuid.UUID, class_id: Optional[uuid.UUID]) -> List[Homework]:
+        return await self.repository.get_for_student(student_id=student_id, class_id=class_id)
 
     async def update_homework(self, homework_id: uuid.UUID, homework_data: HomeworkUpdate) -> Homework:
         homework = await self.repository.update(homework_id, homework_data)

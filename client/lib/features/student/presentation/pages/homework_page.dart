@@ -46,7 +46,7 @@ class _HomeworkPageState extends State<HomeworkPage> {
         return;
       }
 
-      final homeworks = await _api!.getClassHomework(student.classId);
+      final homeworks = await _api!.getMyHomework();
       setState(() {
         _homeworks = homeworks;
         _isLoading = false;
@@ -56,30 +56,6 @@ class _HomeworkPageState extends State<HomeworkPage> {
         _errorMessage = 'Eroare la încărcarea temelor: $e';
         _isLoading = false;
       });
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return Colors.green;
-      case 'overdue':
-        return Colors.red;
-      case 'pending':
-      default:
-        return Colors.orange;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'Completată';
-      case 'overdue':
-        return 'Întârziată';
-      case 'pending':
-      default:
-        return 'În așteptare';
     }
   }
 
@@ -157,7 +133,7 @@ class _HomeworkPageState extends State<HomeworkPage> {
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: _getStatusColor(homework.status).withOpacity(0.3),
+                                  color: Colors.white10,
                                   width: 1.5,
                                 ),
                                 boxShadow: [
@@ -173,39 +149,13 @@ class _HomeworkPageState extends State<HomeworkPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            homework.title,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: _getStatusColor(homework.status).withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(
-                                              color: _getStatusColor(homework.status),
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _getStatusText(homework.status),
-                                            style: TextStyle(
-                                              color: _getStatusColor(homework.status),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    Text(
+                                      homework.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     Row(
@@ -242,13 +192,13 @@ class _HomeworkPageState extends State<HomeworkPage> {
                                         Icon(
                                           Icons.calendar_today,
                                           size: 16,
-                                          color: homework.status == 'overdue' ? Colors.red : Colors.white60,
+                                          color: Colors.white60,
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
                                           _formatDueDate(homework.dueDate),
-                                          style: TextStyle(
-                                            color: homework.status == 'overdue' ? Colors.red : Colors.white60,
+                                          style: const TextStyle(
+                                            color: Colors.white60,
                                             fontSize: 13,
                                           ),
                                         ),

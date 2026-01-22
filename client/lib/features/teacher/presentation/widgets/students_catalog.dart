@@ -3,7 +3,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../student/data/model/student.dart';
 import '../../data/model/teacher_model.dart';
+import '../../domain/entities/attendance_entity.dart';
 import '../controllers/teacher_dashboard_controller.dart';
+import 'student_details_widgets.dart';
 
 class StudentsCatalog extends StatefulWidget {
   final SchoolClass schoolClass;
@@ -24,10 +26,68 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
   final List<StudentModel> _selectedStudents = [];
   DateTime _selectedDate = DateTime.now();
 
+  // New: catalog sections
+  int _activeSection = 0; // 0=Elevi, 1=Note, 2=Absențe, 3=Teme
+
+  // UX improvements
+  String _sortBy = 'name'; // name, email
+  bool _showTutorial = false;
+
+  // Getters for discipline and teacher name
+  String? get _disciplineName => widget.controller.getSubjectNameForClass(widget.schoolClass.id);
+  String get _teacherName => widget.controller.teacher.value?.username ?? 'Profesor';
+
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+  }
+
+  // Helper: Select all filtered students
+  void _selectAll() {
+    setState(() {
+      _selectedStudents.clear();
+      _selectedStudents.addAll(_filteredStudents);
+    });
+    _showSnackbar('${_selectedStudents.length} elevi selectați', Icons.check_circle);
+  }
+
+  // Helper: Deselect all
+  void _deselectAll() {
+    setState(() {
+      _selectedStudents.clear();
+    });
+    _showSnackbar('Selecție anulată', Icons.clear);
+  }
+
+  // Helper: Toggle student selection
+  void _toggleStudent(StudentModel student) {
+    setState(() {
+      if (_selectedStudents.contains(student)) {
+        _selectedStudents.remove(student);
+      } else {
+        _selectedStudents.add(student);
+      }
+    });
+  }
+
+  // Helper: Show friendly snackbar
+  void _showSnackbar(String message, IconData icon) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Text(message),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: const Color(0xFF1A1F26),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -48,6 +108,13 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                 student.email.toLowerCase().contains(query),
           )
           .toList();
+    }
+
+    // Sort students for better UX
+    if (_sortBy == 'name') {
+      students.sort((a, b) => a.username.toLowerCase().compareTo(b.username.toLowerCase()));
+    } else if (_sortBy == 'email') {
+      students.sort((a, b) => a.email.toLowerCase().compareTo(b.email.toLowerCase()));
     }
 
     return students;
@@ -79,11 +146,175 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     }
   }
 
+  Map<String, String>? get _currentSelectedSubject {
+    final classId = widget.schoolClass.id;
+    final selected = widget.controller.selectedSubjectByClassId[classId];
+    if (selected == null || (selected['id'] ?? '').isEmpty) return null;
+    return {'id': selected['id']!, 'name': selected['name'] ?? 'Necunoscut'};
+  }
+
+  List<Map<String, String>> get _subjectsForThisClass {
+    // Prefer backend-provided subjects per class (from /teachers/me)
+    final fromClass = widget.schoolClass.subjects
+        .where((s) => s.id.isNotEmpty)
+        .map((s) => {'id': s.id, 'name': s.name})
+        .toList();
+    if (fromClass.isNotEmpty) return fromClass;
+
+    // Fallback to whatever controller can infer (e.g., from schedules)
+    try {
+      return widget.controller.getSubjectsForClass(widget.schoolClass.id);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _ensureSubjectSelectedForActions() async {
+    // Always rely on teacher schedule subjects.
+    if (widget.controller.teacherSchedules.isEmpty) {
+      await widget.controller.fetchTeacherSchedule();
+    }
+
+    // Fetch subjects from backend endpoint (teacher_class_subjects)
+    await widget.controller.fetchMySubjectsForClass(widget.schoolClass.id);
+
+    final subjects = _subjectsForThisClass;
+    if (subjects.isEmpty) {
+      return; // handled by _getSubjectId snackbar
+    }
+
+    // If already selected and still valid, keep it.
+    final current = _currentSelectedSubject;
+    if (current != null && subjects.any((s) => s['id'] == current['id'])) {
+      return;
+    }
+
+    // Auto-select if only one
+    if (subjects.length == 1) {
+      widget.controller.setSelectedSubjectForClass(
+        widget.schoolClass.id,
+        subjectId: subjects.first['id']!,
+        subjectName: subjects.first['name']!,
+      );
+      return;
+    }
+
+    // Multiple subjects -> let user choose once
+    final picked = await _showPickSubjectDialog(subjects);
+    if (picked != null && (picked['id'] ?? '').isNotEmpty) {
+      widget.controller.setSelectedSubjectForClass(
+        widget.schoolClass.id,
+        subjectId: picked['id']!,
+        subjectName: picked['name'] ?? 'Necunoscut',
+      );
+    }
+  }
+
+  // Helper: Ensure subject is selected, with user prompt if needed
+  Future<void> _ensureSubjectSelected() async {
+    final classId = widget.schoolClass.id;
+
+    // Ensure we have teacher schedule loaded (best source)
+    if (widget.controller.teacherSchedules.isEmpty) {
+      await widget.controller.fetchTeacherSchedule();
+    }
+
+    // Try to fetch subjects from backend endpoint (teacher_class_subjects table)
+    await widget.controller.fetchMySubjectsForClass(classId);
+
+    final subjects = widget.controller.getSubjectsForClass(classId);
+    if (subjects.isEmpty) {
+      // fallback: try class schedule endpoint and retry
+      await widget.controller.fetchClassSchedule(classId);
+      final subjects2 = widget.controller.getSubjectsForClass(classId);
+      if (subjects2.isEmpty) return;
+      if (subjects2.length == 1) {
+        widget.controller.setSelectedSubjectForClass(
+          classId,
+          subjectId: subjects2.first['id']!,
+          subjectName: subjects2.first['name']!,
+        );
+        return;
+      }
+      await _showPickSubjectDialog(subjects2);
+      return;
+    }
+
+    // If already selected and still valid, keep it.
+    final current = _currentSelectedSubject;
+    if (current != null && subjects.any((s) => s['id'] == current['id'])) {
+      return;
+    }
+
+    // Auto-select if only one
+    if (subjects.length == 1) {
+      widget.controller.setSelectedSubjectForClass(
+        classId,
+        subjectId: subjects.first['id']!,
+        subjectName: subjects.first['name']!,
+      );
+      return;
+    }
+
+    // Multiple subjects -> ask user once
+    final already = widget.controller.selectedSubjectByClassId[classId];
+    if (already != null && (already['id'] ?? '').isNotEmpty) {
+      return;
+    }
+
+    await _showPickSubjectDialog(subjects);
+  }
+
+  Future<Map<String, String>?> _showPickSubjectDialog(List<Map<String, String>> subjects) async {
+    final classId = widget.schoolClass.id;
+
+    return await Get.dialog<Map<String, String>>(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Alege disciplina', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: subjects
+              .map(
+                (s) => ListTile(
+                  title: Text(s['name'] ?? 'Necunoscut', style: const TextStyle(color: Colors.white)),
+                  onTap: () {
+                    widget.controller.setSelectedSubjectForClass(
+                      classId,
+                      subjectId: s['id'] ?? '',
+                      subjectName: s['name'] ?? 'Necunoscut',
+                    );
+                    Get.back(result: s);
+                    setState(() {});
+                  },
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _getSubjectId() async {
+    final classId = widget.schoolClass.id;
+
+    await _ensureSubjectSelectedForActions();
+
+    final subjectId = widget.controller.getSubjectIdForClass(classId) ?? await widget.controller.resolveSubjectIdForClass(classId);
+
+    if (subjectId == null || subjectId.isEmpty) {
+      Get.snackbar('Eroare', 'Nu s-a putut determina materia pentru această clasă');
+      return null;
+    }
+
+    return subjectId;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Make header reactive and include AppBar here so ClassDetailsPage doesn't duplicate it
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1419),
+      backgroundColor: const Color(0xFF0A0E14),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1F26),
         elevation: 0,
@@ -91,115 +322,68 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Get.back(),
         ),
-        title: Obx(() {
-          final subjectName = widget.controller.getSubjectNameForClass(
-            widget.schoolClass.id,
-          );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.schoolClass.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (subjectName != null && subjectName.isNotEmpty)
-                Text(
-                  subjectName,
-                  style: const TextStyle(
-                    color: Colors.blueAccent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-            ],
-          );
-        }),
+        title: const Text(
+          'Catalog',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: Column(
         children: [
-          // Header info
-          _buildCompactHeader(),
-
-          // Search bar
-          _buildSearchBar(),
-
-          // Student list
-          Expanded(child: _buildStudentsList()),
-
-          // Bulk action bar
-          if (_selectedStudents.isNotEmpty) _buildBulkActionBar(),
+          _buildHeaderWithSubjectDropdown(),
+          _buildTopTabs(),
+          Expanded(child: _buildSectionBody()),
+          if (_selectedStudents.isNotEmpty && _activeSection == 0) _buildBulkActionBar(),
         ],
       ),
     );
   }
 
-  Widget _buildCompactHeader() {
+  Widget _buildTopTabs() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: const Color(0xFF1A1F26),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F26),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white10),
+      ),
       child: Row(
         children: [
-          _buildStatBadge(
-            Icons.people,
-            '${widget.schoolClass.students.length} elevi',
-          ),
-          const SizedBox(width: 12),
-          _buildStatBadge(
-            Icons.calendar_today,
-            DateFormat('dd MMM', 'ro').format(_selectedDate),
-            onTap: _selectDate,
-          ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: () => _showQuickAttendanceSheet(),
-            icon: const Icon(Icons.checklist, size: 18),
-            label: const Text('Prezență'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-          ),
+          _buildTabButton('Elevi', 0),
+          _buildTabButton('Note', 1),
+          _buildTabButton('Absențe', 2),
+          _buildTabButton('Teme', 3),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      color: const Color(0xFF1A1F26),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0F1419),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[700]!.withOpacity(0.5)),
-        ),
-        child: TextField(
-          controller: _searchController,
-          onChanged: (_) => setState(() {}),
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Caută elev...',
-            hintStyle: TextStyle(color: Colors.grey[500]),
-            prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.grey),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {});
-                    },
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 10,
+  Widget _buildTabButton(String label, int index) {
+    final active = _activeSection == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () async {
+          setState(() => _activeSection = index);
+          if (index != 0) {
+            // Ensure we have a subject selected for correct filtering
+            await _ensureSubjectSelected();
+            setState(() {});
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? Colors.blueAccent.withOpacity(0.25) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? Colors.white : Colors.white70,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
             ),
           ),
         ),
@@ -207,338 +391,307 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     );
   }
 
-  Future<String?> _getSubjectId() async {
-    final subjectId = await widget.controller.resolveSubjectIdForClass(
-      widget.schoolClass.id,
-    );
-    if (subjectId == null || subjectId.isEmpty) {
-      Get.snackbar(
-        'Eroare',
-        'Nu s-a putut determina materia pentru această clasă',
-      );
+  Widget _buildSectionBody() {
+    switch (_activeSection) {
+      case 0:
+        return Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(child: _buildStudentsList()),
+          ],
+        );
+      case 1:
+        return _buildClassGradesView();
+      case 2:
+        return _buildClassAttendanceView();
+      case 3:
+        return _buildClassHomeworkView();
+      default:
+        return const SizedBox.shrink();
     }
-    return subjectId;
   }
 
-  void _showQuickAttendanceSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1F26),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _QuickAttendanceSheet(
-        students: _filteredStudents,
-        selectedDate: _selectedDate,
-        onSelectDate: () async {
-          Navigator.pop(context);
-          await _selectDate();
-          _showQuickAttendanceSheet();
-        },
-        // Quick Attendance Sheet - Toți prezenți / Toți absenți
-        onMarkAll: (status) async {
-          final subjectId = await _getSubjectId();
-          if (subjectId == null || subjectId.isEmpty) return;
+  Widget _buildClassGradesView() {
+    final classStudentIds = widget.schoolClass.students.map((s) => s.userId).whereType<String>().toSet();
+    final classId = widget.schoolClass.id;
+    final subjectId = widget.controller.getSubjectIdForClass(classId);
 
-          final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-          final baseData = {
-            'status': status,
-            'attendance_date': dateStr,
-            'subject_id': subjectId,
-          };
+    final filtered = widget.controller.grades.where((g) {
+      final sid = g.studentId;
+      if (sid == null) return false;
+      if (!classStudentIds.contains(sid)) return false;
+      if (subjectId != null && subjectId.isNotEmpty && g.subjectId != subjectId) return false;
+      return true;
+    }).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-          bool hasSuccess = false;
-          int successCount = 0;
-
-          for (final student in _filteredStudents) {
-            final id = student.userId?.trim() ?? '';
-            if (id.isNotEmpty) {
-              try {
-                await widget.controller.markAttendanceForStudent(id, baseData);
-                successCount++;
-                hasSuccess = true;
-              } catch (_) {
-                // continuăm cu următorul elev
-              }
-            }
-          }
-
-          Navigator.pop(context);
-
-          if (hasSuccess) {
-            Get.snackbar(
-              'Succes',
-              'Prezență marcată pentru $successCount elev(i)',
-              snackPosition: SnackPosition.BOTTOM,
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _ensureSubjectSelected();
+        await widget.controller.fetchTeacherGrades();
+        setState(() {});
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        itemCount: filtered.isEmpty ? 1 : filtered.length,
+        itemBuilder: (context, index) {
+          if (filtered.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text('Nu există note pentru această clasă', style: TextStyle(color: Colors.grey[400])),
+              ),
             );
           }
-        },
 
-        // Individual student in quick sheet
-        onMarkStudent: (student, status) async {
-          final id = student.userId?.trim() ?? '';
-          if (id.isEmpty) return;
-
-          final subjectId = await _getSubjectId();
-          if (subjectId == null || subjectId.isEmpty) return;
-
-          final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-          await widget.controller.markAttendanceForStudent(id, {
-            'status': status,
-            'attendance_date': dateStr,
-            'subject_id': subjectId,
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatBadge(IconData icon, String text, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.blueAccent.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.blueAccent, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+          final g = filtered[index];
+          final student = widget.schoolClass.students.firstWhereOrNull((s) => s.userId == g.studentId);
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1F26),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
             ),
-            if (onTap != null) ...[
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.edit_calendar,
-                color: Colors.blueAccent,
-                size: 14,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudentsList() {
-    if (_filteredStudents.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredStudents.length,
-      itemBuilder: (context, index) {
-        final student = _filteredStudents[index];
-        return _buildStudentCard(student, index);
-      },
-    );
-  }
-
-  Widget _buildStudentCard(StudentModel student, int index) {
-    final isSelected = _selectedStudents.contains(student);
-    final colors = [
-      Colors.blueAccent,
-      Colors.purple,
-      Colors.teal,
-      Colors.orange,
-      Colors.pink,
-    ];
-    final avatarColor = colors[index % colors.length];
-
-    return GestureDetector(
-      onTap: () {
-        if (_selectedStudents.isNotEmpty) {
-          setState(() {
-            if (isSelected) {
-              _selectedStudents.remove(student);
-            } else {
-              _selectedStudents.add(student);
-            }
-          });
-        }
-      },
-      onLongPress: () {
-        setState(() {
-          if (isSelected) {
-            _selectedStudents.remove(student);
-          } else {
-            _selectedStudents.add(student);
-          }
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.blueAccent.withOpacity(0.15)
-              : const Color(0xFF1A1F26),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? Colors.blueAccent : Colors.transparent,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Selection checkbox
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: _selectedStudents.isNotEmpty ? 40 : 0,
-                child: _selectedStudents.isNotEmpty
-                    ? Checkbox(
-                        value: isSelected,
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedStudents.add(student);
-                            } else {
-                              _selectedStudents.remove(student);
-                            }
-                          });
-                        },
-                        activeColor: Colors.blueAccent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      )
-                    : null,
-              ),
-
-              // Avatar
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [avatarColor, avatarColor.withOpacity(0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    // Safely get first character of username; fallback to '?' if empty
-                    (student.username.isNotEmpty
-                        ? student.username[0].toUpperCase()
-                        : '?'),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  child: Center(
+                    child: Text(
+                      g.value.toString(),
+                      style: const TextStyle(color: Colors.orange, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-
-              // Student info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      student.username,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(student?.username ?? 'Elev', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${g.subjectName ?? _disciplineName ?? ''} • ${g.type.name}',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
+                    ],
+                  ),
+                ),
+                Text(
+                  DateFormat('dd.MM').format(g.createdAt),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildClassHomeworkView() {
+    return FutureBuilder<void>(
+      future: widget.controller.fetchClassHomework(widget.schoolClass.id),
+      builder: (context, snapshot) {
+        final items = widget.controller.homeworkList;
+        if (snapshot.connectionState == ConnectionState.waiting && items.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (items.isEmpty) {
+          return Center(child: Text('Nu există teme pentru această clasă', style: TextStyle(color: Colors.grey[400])));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final h = items[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1F26),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(h.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text(h.description ?? '', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: Colors.grey[500], size: 14),
+                      const SizedBox(width: 6),
+                      Text(DateFormat('dd MMM yyyy', 'ro').format(h.dueDate), style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    ],
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildClassAttendanceView() {
+    return FutureBuilder<List<Attendance>>(
+      future: _loadClassAttendance(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return Center(child: Text('Nu există absențe/prezențe pentru această clasă', style: TextStyle(color: Colors.grey[400])));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          itemCount: list.length,
+          itemBuilder: (context, index) {
+            final a = list[index];
+            final student = widget.schoolClass.students.firstWhereOrNull((s) => s.userId == a.studentId);
+            final color = a.status == AttendanceStatus.absent ? Colors.red : Colors.green;
+            final label = a.status == AttendanceStatus.absent ? 'Absent' : 'Prezent';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1F26),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.email_outlined,
-                          size: 14,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            student.email,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[400],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        Text(student?.username ?? 'Elev', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
-                  ],
+                  ),
+                  Text(DateFormat('dd.MM').format(a.attendanceDate), style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<Attendance>> _loadClassAttendance() async {
+    await _ensureSubjectSelected();
+    final subjectId = widget.controller.getSubjectIdForClass(widget.schoolClass.id);
+    final tokenStudentIds = widget.schoolClass.students.map((s) => s.userId).whereType<String>().toList();
+
+    final all = <Attendance>[];
+    for (final sid in tokenStudentIds) {
+      await widget.controller.fetchStudentAttendance(sid);
+      all.addAll(widget.controller.attendanceList);
+    }
+
+    final filtered = all.where((a) {
+      if (subjectId != null && subjectId.isNotEmpty && a.subjectId != subjectId) return false;
+      return true;
+    }).toList()
+      ..sort((a, b) => b.attendanceDate.compareTo(a.attendanceDate));
+
+    return filtered;
+  }
+
+  void _showHomeworkDialog(StudentModel student) {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Temă pentru ${student.username}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Titlu',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                filled: true,
+                fillColor: const Color(0xFF0F1419),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
               ),
-
-              // Quick action buttons
-              if (_selectedStudents.isEmpty) ...[
-                _buildQuickAction(
-                  Icons.grade,
-                  Colors.orange,
-                  () => _showAddGradeDialog(student),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Descriere',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                filled: true,
+                fillColor: const Color(0xFF0F1419),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                const SizedBox(width: 8),
-                _buildQuickAction(
-                  Icons.check_circle,
-                  Colors.green,
-                  () => _showQuickAttendanceDialog(student),
-                ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(IconData icon, Color color, VoidCallback onTap) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(10),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
           ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-      ),
-    );
-  }
+          ElevatedButton(
+            onPressed: () async {
+              final subjectId = await _getSubjectId();
+              if (subjectId == null) return;
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[700]),
-          const SizedBox(height: 16),
-          Text(
-            _searchController.text.isEmpty
-                ? 'Nu sunt elevi în această clasă'
-                : 'Niciun rezultat pentru "${_searchController.text}"',
-            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
+              final ids = [if (student.userId != null) student.userId!];
+              await widget.controller.createHomeworkForStudents(
+                studentIds: ids,
+                classId: widget.schoolClass.id,
+                subjectId: subjectId,
+                title: titleController.text,
+                description: descriptionController.text,
+                dueDate: _selectedDate,
+              );
+              Get.back();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Trimite', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -550,34 +703,67 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1A1F26),
-        border: Border(top: BorderSide(color: Colors.grey[800]!)),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
       ),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Obx(() {
-                final loading = widget.controller.isLoadingHomework.value;
-                return _buildBulkButton(
-                  loading ? 'Se încarcă...' : 'Temă',
-                  loading ? Icons.hourglass_top : Icons.assignment,
-                  Colors.blue,
-                  loading ? () {} : _showBulkHomeworkDialog,
-                );
-              }),
+            Text(
+              '${_selectedStudents.length} elev${_selectedStudents.length > 1 ? "i" : ""} selectat${_selectedStudents.length > 1 ? "i" : ""}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Obx(() {
-                final loading = widget.controller.isLoadingAttendance.value;
-                return _buildBulkButton(
-                  loading ? 'Se încarcă...' : 'Prezență',
-                  loading ? Icons.hourglass_top : Icons.check_circle,
-                  Colors.green,
-                  loading ? () {} : _showBulkAttendanceDialog,
-                );
-              }),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showBulkGradeDialog,
+                    icon: const Icon(Icons.grade, size: 20),
+                    label: const Text('Notă'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showBulkAttendanceDialog,
+                    icon: const Icon(Icons.event_busy, size: 20),
+                    label: const Text('Absență'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _showBulkHomeworkDialog,
+                    icon: const Icon(Icons.assignment, size: 20),
+                    label: const Text('Temă'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _deselectAll,
+              child: const Text('Anulează selecția', style: TextStyle(color: Colors.grey)),
             ),
           ],
         ),
@@ -585,36 +771,358 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     );
   }
 
-  Widget _buildBulkButton(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
+  void _showBulkGradeDialog() {
+    final gradeController = TextEditingController();
+    String gradeType = 'other';
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1F26),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Notă pentru ${_selectedStudents.length} elevi',
+              style: const TextStyle(color: Colors.white),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: gradeController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white, fontSize: 24),
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    hintText: '2-10',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    filled: true,
+                    fillColor: const Color(0xFF0F1419),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: gradeType,
+                  dropdownColor: const Color(0xFF1A1F26),
+                  decoration: InputDecoration(
+                    labelText: 'Tip notă',
+                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: const Color(0xFF0F1419),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'exam', child: Text('Teză', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'test', child: Text('Test', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'homework', child: Text('Temă', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'assignment', child: Text('Lucrare', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'other', child: Text('Altele', style: TextStyle(color: Colors.white))),
+                  ],
+                  onChanged: (v) => setDialogState(() => gradeType = v ?? 'other'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final grade = int.tryParse(gradeController.text);
+                  if (grade == null || grade < 2 || grade > 10) {
+                    Get.snackbar('Eroare', 'Introdu o notă validă (2-10)');
+                    return;
+                  }
+
+                  final subjectId = await _getSubjectId();
+                  if (subjectId == null) return;
+
+                  final ids = _selectedStudents.map((s) => s.userId).whereType<String>().toList();
+                  await widget.controller.createGradesForStudents(
+                    studentIds: ids,
+                    value: grade,
+                    type: gradeType,
+                    classId: widget.schoolClass.id,
+                    subjectId: subjectId,
+                  );
+
+                  Get.back();
+                  _deselectAll();
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('Salvează', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showBulkHomeworkDialog() {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Temă pentru ${_selectedStudents.length} elevi',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Titlu',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                filled: true,
+                fillColor: const Color(0xFF0F1419),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Descriere',
+                hintStyle: TextStyle(color: Colors.grey[600]),
+                filled: true,
+                fillColor: const Color(0xFF0F1419),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final subjectId = await _getSubjectId();
+              if (subjectId == null) return;
+
+              final ids = _selectedStudents.map((s) => s.userId).whereType<String>().toList();
+              await widget.controller.createHomeworkForStudents(
+                studentIds: ids,
+                classId: widget.schoolClass.id,
+                subjectId: subjectId,
+                title: titleController.text,
+                description: descriptionController.text,
+                dueDate: _selectedDate,
+              );
+              Get.back();
+              _deselectAll();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Trimite', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBulkAttendanceDialog() {
+    String status = 'present';
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1A1F26),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Prezență pentru ${_selectedStudents.length} elevi',
+              style: const TextStyle(color: Colors.white),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate),
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: status,
+                  dropdownColor: const Color(0xFF1A1F26),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF0F1419),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'present', child: Text('Prezent', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'absent', child: Text('Absent', style: TextStyle(color: Colors.white))),
+                  ],
+                  onChanged: (v) => setDialogState(() => status = v ?? 'present'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final ids = _selectedStudents.map((s) => s.userId).whereType<String>().toList();
+
+                  final subjectId = await _getSubjectId();
+                  if (subjectId == null) return;
+
+                  final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+                  final data = {
+                    'status': status,
+                    'attendance_date': dateStr,
+                    'subject_id': subjectId,
+                    'class_id': widget.schoolClass.id,
+                  };
+
+                  for (final id in ids) {
+                    if (id.isNotEmpty) {
+                      await widget.controller.markAttendanceForStudent(
+                        studentId: id,
+                        subjectId: subjectId,
+                        date: _selectedDate,
+                        status: status,
+                        notes: null,
+                      );
+                    }
+                  }
+
+                  _deselectAll();
+                  Get.back();
+
+                  Get.snackbar(
+                    'Succes',
+                    'Prezența a fost actualizată pentru ${ids.length} elevi',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                child: const Text('Salvează', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showQuickAttendanceDialog(StudentModel student) {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Prezență: ${student.username}',
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate),
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildAttendanceOption(
+                  'Prezent',
+                  Colors.green,
+                  Icons.check_circle,
+                  () async {
+                    final subjectId = await _getSubjectId();
+                    if (subjectId == null) return;
+
+                    final sid = student.userId;
+                    if (sid == null || sid.isEmpty) return;
+                    await widget.controller.markAttendanceForStudent(
+                      studentId: sid,
+                      subjectId: subjectId,
+                      date: _selectedDate,
+                      status: 'present',
+                      notes: null,
+                    );
+                    Get.back();
+                  },
+                ),
+                _buildAttendanceOption(
+                  'Absent',
+                  Colors.red,
+                  Icons.cancel,
+                  () async {
+                    final subjectId = await _getSubjectId();
+                    if (subjectId == null) return;
+
+                    final sid2 = student.userId;
+                    if (sid2 == null || sid2.isEmpty) return;
+                    await widget.controller.markAttendanceForStudent(
+                      studentId: sid2,
+                      subjectId: subjectId,
+                      date: _selectedDate,
+                      status: 'absent',
+                      notes: null,
+                    );
+                    Get.back();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceOption(String label, Color color, IconData icon, VoidCallback onTap) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: color.withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.4)),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(height: 4),
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 6),
               Text(
                 label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -623,141 +1131,355 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     );
   }
 
-  Future<void> _showAddGradeDialog(StudentModel student) async {
+  void _openStudentDetails(StudentModel student) {
+    Get.to(() => StudentDetailsPage(
+      student: student,
+      controller: widget.controller,
+      classId: widget.schoolClass.id,
+      disciplineName: _disciplineName,
+      teacherName: _teacherName,
+      onAddGrade: () => _showAddGradeDialog(student),
+      onAddAbsence: () => _showQuickAttendanceDialog(student),
+    ));
+  }
+
+  // ---------- Missing UI helpers (restored) ----------
+  Widget _buildSimpleHeader() {
+    final discipline = _disciplineName ?? 'Nespecificat';
+    final dateStr = DateFormat('dd MMM yyyy', 'ro').format(_selectedDate);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F26),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.schoolClass.name,
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.book, color: Colors.blueAccent, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        discipline,
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: _selectDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
+                      const SizedBox(width: 6),
+                      Text(dateStr, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              )
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderWithSubjectDropdown() {
+    final dateStr = DateFormat('dd MMM yyyy', 'ro').format(_selectedDate);
+    final subjects = _subjectsForThisClass;
+    final selected = _currentSelectedSubject;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F26),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.schoolClass.name,
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1419),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF1A1F26),
+                      value: (selected != null && subjects.any((s) => s['id'] == selected['id'])) ? selected['id'] : (subjects.length == 1 ? subjects.first['id'] : null),
+                      hint: Text(
+                        subjects.isEmpty ? 'Fără disciplină în orar' : 'Alege disciplina',
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      items: subjects
+                          .map(
+                            (s) => DropdownMenuItem<String>(
+                              value: s['id'],
+                              child: Text(
+                                s['name'] ?? 'Necunoscut',
+                                style: const TextStyle(color: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: subjects.isEmpty
+                          ? null
+                          : (id) {
+                              final picked = subjects.firstWhereOrNull((s) => s['id'] == id);
+                              if (picked == null || (picked['id'] ?? '').isEmpty) return;
+                              widget.controller.setSelectedSubjectForClass(
+                                widget.schoolClass.id,
+                                subjectId: picked['id']!,
+                                subjectName: picked['name'] ?? 'Necunoscut',
+                              );
+                              setState(() {});
+                            },
+                      icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _selectDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
+                      const SizedBox(width: 6),
+                      Text(dateStr, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F26),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (_) => setState(() {}),
+        style: const TextStyle(color: Colors.white, fontSize: 15),
+        decoration: InputDecoration(
+          hintText: 'Caută elev...',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.5)),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.white.withOpacity(0.5)),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentsList() {
+    if (_filteredStudents.isEmpty) {
+      return Center(
+        child: Text(
+          _searchController.text.isEmpty ? 'Nu sunt elevi în această clasă' : 'Niciun rezultat',
+          style: TextStyle(color: Colors.grey[400]),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: _filteredStudents.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final student = _filteredStudents[index];
+        final isSelected = _selectedStudents.contains(student);
+
+        return InkWell(
+          onTap: () {
+            if (_selectedStudents.isNotEmpty) {
+              setState(() {
+                if (isSelected) {
+                  _selectedStudents.remove(student);
+                } else {
+                  _selectedStudents.add(student);
+                }
+              });
+            }
+          },
+          onLongPress: () {
+            setState(() {
+              if (isSelected) {
+                _selectedStudents.remove(student);
+              } else {
+                _selectedStudents.add(student);
+              }
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.blueAccent.withOpacity(0.15) : const Color(0xFF1A1F26),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isSelected ? Colors.blueAccent.withOpacity(0.5) : Colors.white10),
+            ),
+            child: Row(
+              children: [
+                if (_selectedStudents.isNotEmpty)
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selectedStudents.add(student);
+                        } else {
+                          _selectedStudents.remove(student);
+                        }
+                      });
+                    },
+                    activeColor: Colors.blueAccent,
+                  )
+                else
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                    child: Text(
+                      student.username.isNotEmpty ? student.username[0].toUpperCase() : '?',
+                      style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    student.username,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (_selectedStudents.isEmpty) ...[
+                  IconButton(
+                    icon: const Icon(Icons.grade, color: Colors.orange, size: 22),
+                    onPressed: () => _showAddGradeDialog(student),
+                    tooltip: 'Notă',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.event_busy, color: Colors.red, size: 22),
+                    onPressed: () => _showQuickAttendanceDialog(student),
+                    tooltip: 'Absență',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.assignment, color: Colors.blue, size: 22),
+                    onPressed: () => _showHomeworkDialog(student),
+                    tooltip: 'Temă',
+                  ),
+                  PopupMenuButton(
+                    icon: const Icon(Icons.more_vert, color: Colors.white70),
+                    color: const Color(0xFF1A1F26),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.visibility, color: Colors.blueAccent, size: 20),
+                            const SizedBox(width: 10),
+                            const Text('Vezi detalii', style: TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                        onTap: () => Future.delayed(Duration.zero, () => _openStudentDetails(student)),
+                      ),
+                      PopupMenuItem(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.assignment, color: Colors.blue, size: 20),
+                            const SizedBox(width: 10),
+                            const Text('Temă', style: TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                        onTap: () => Future.delayed(Duration.zero, () => _showHomeworkDialog(student)),
+                      ),
+                    ],
+                  ),
+                ]
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Minimal add grade dialog (restored)
+  void _showAddGradeDialog(StudentModel student) async {
     final gradeController = TextEditingController();
     String gradeType = 'other';
 
-    String classId = widget.schoolClass.id;
-    if (classId.isEmpty) {
-      final alt = widget.controller.classes.firstWhereOrNull(
-        (c) => c.name == widget.schoolClass.name,
-      );
-      if (alt != null && alt.id.isNotEmpty) {
-        classId = alt.id;
-      }
-    }
+    final subjectId = await _getSubjectId();
+    if (subjectId == null) return;
 
-    if (classId.isEmpty) {
-      Get.snackbar(
-        'Eroare',
-        'Id-ul clasei este invalid. Reîmprospătează pagina și încearcă din nou.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    String? subjectId = widget.controller.getSubjectIdForClass(classId);
-    String? subjectName = widget.controller.getSubjectNameForClass(classId);
-
-    if (subjectId == null) {
-      await widget.controller.fetchClassSchedule(classId);
-      final classSchedules = widget.controller.schedules;
-
-      final match = classSchedules.firstWhereOrNull(
-        (s) => s.teacherId == widget.controller.teacher.value?.id,
-      );
-      if (match != null) {
-        subjectId = match.subjectId;
-        subjectName ??= match.subjectName;
-      } else {
-        final subjects = <Map<String, String>>[];
-        for (var s in classSchedules) {
-          if (s.subjectId.isNotEmpty &&
-              !subjects.any((e) => e['id'] == s.subjectId)) {
-            subjects.add({
-              'id': s.subjectId,
-              'name': s.subjectName ?? 'Necunoscut',
-            });
-          }
-        }
-
-        if (subjects.isEmpty) {
-          Get.snackbar(
-            'Eroare',
-            'Nu s-a găsit materia pentru această clasă. Verificați orarul.',
-            snackPosition: SnackPosition.BOTTOM,
-          );
-          return;
-        }
-
-        if (subjects.length == 1) {
-          subjectId = subjects.first['id'];
-          subjectName ??= subjects.first['name'];
-        } else {
-          final picked = await showDialog<String?>(
-            context: context,
-            builder: (context) {
-              String? selected = subjects.first['id'];
-              return AlertDialog(
-                backgroundColor: const Color(0xFF1A1F26),
-                title: const Text(
-                  'Selectează materia',
-                  style: TextStyle(color: Colors.white),
-                ),
-                content: StatefulBuilder(
-                  builder: (context, setState) {
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: subjects.map((sub) {
-                        return RadioListTile<String>(
-                          activeColor: Colors.blueAccent,
-                          value: sub['id']!,
-                          groupValue: selected,
-                          onChanged: (v) => setState(() => selected = v),
-                          title: Text(
-                            sub['name']!,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, null),
-                    child: const Text(
-                      'Anulează',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, selected),
-                    child: const Text('Selectează'),
-                  ),
-                ],
-              );
-            },
-          );
-
-          if (picked == null) return;
-          subjectId = picked;
-          subjectName = subjects.firstWhere((e) => e['id'] == picked)['name'];
-        }
-      }
-    }
-
-    if (subjectId == null) {
-      Get.snackbar(
-        'Eroare',
-        'Nu s-a găsit materia pentru această clasă. Verificați orarul.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
+    final subjectName = widget.controller.getSubjectNameForClass(widget.schoolClass.id);
 
     Get.dialog(
       StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
             backgroundColor: const Color(0xFF1A1F26),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Notă pentru ${student.username}',
-              style: const TextStyle(color: Colors.white, fontSize: 18),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Notă pentru ${student.username}', style: const TextStyle(color: Colors.white)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -771,15 +1493,10 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.book,
-                          color: Colors.blueAccent,
-                          size: 18,
-                        ),
+                        const Icon(Icons.book, color: Colors.blueAccent, size: 18),
                         const SizedBox(width: 8),
-                        Text(
-                          subjectName,
-                          style: const TextStyle(color: Colors.white),
+                        Expanded(
+                          child: Text(subjectName, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
@@ -815,581 +1532,55 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                     ),
                   ),
                   items: const [
-                    DropdownMenuItem(
-                      value: 'exam',
-                      child: Text(
-                        'Teză',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'test',
-                      child: Text(
-                        'Test',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'homework',
-                      child: Text(
-                        'Temă',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'assignment',
-                      child: Text(
-                        'Lucrare',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'other',
-                      child: Text(
-                        'Altele',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
+                    DropdownMenuItem(value: 'exam', child: Text('Teză', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'test', child: Text('Test', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'homework', child: Text('Temă', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'assignment', child: Text('Lucrare', style: TextStyle(color: Colors.white))),
+                    DropdownMenuItem(value: 'other', child: Text('Altele', style: TextStyle(color: Colors.white))),
                   ],
-                  onChanged: (v) =>
-                      setDialogState(() => gradeType = v ?? 'other'),
+                  onChanged: (v) => setDialogState(() => gradeType = v ?? 'other'),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Get.back(),
-                child: Text(
-                  'Anulează',
-                  style: TextStyle(color: Colors.grey[400]),
-                ),
+                child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final grade = int.tryParse(gradeController.text);
                   if (grade == null || grade < 2 || grade > 10) {
-                    Get.snackbar(
-                      'Eroare',
-                      'Introdu o notă validă (2-10)',
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
+                    Get.snackbar('Eroare', 'Introdu o notă validă (2-10)');
                     return;
                   }
 
-                  final ids = [if (student.userId != null) student.userId!];
-                  if (ids.isEmpty) return;
+                  final sid = student.userId;
+                  if (sid == null || sid.isEmpty) return;
 
-                  // Închidem dialogul imediat după "Salvează".
-                  // Astfel UX-ul e bun și în offline (nu rămâne blocat).
-                  if (Get.isDialogOpen ?? false) {
+                  // Close dialog immediately for snappy UX; errors will be shown via snackbar.
+                  if (Get.isDialogOpen == true) {
                     Get.back();
                   }
 
                   try {
-                    await widget.controller.createGradesForStudents(ids, {
-                      'value': grade,
-                      'types': gradeType,
-                      'subject_id': subjectId,
-                    });
-
-                    // createGradesForStudents deja afișează snackbar-uri (Succes/Offline/Parțial)
-                    // dar păstrăm și un fallback discret dacă e nevoie.
-                  } catch (e) {
-                    Get.snackbar(
-                      'Eroare',
-                      'Nu s-a putut salva nota: $e',
-                      snackPosition: SnackPosition.BOTTOM,
-                      backgroundColor: Colors.red.withOpacity(0.7),
-                      colorText: Colors.white,
+                    await widget.controller.createGradesForStudents(
+                      studentIds: [sid],
+                      value: grade,
+                      type: gradeType,
+                      classId: widget.schoolClass.id,
+                      subjectId: subjectId,
                     );
+                  } catch (e) {
+                    Get.snackbar('Eroare', 'Nu s-a putut salva nota: $e');
                   }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                child: const Text(
-                  'Salvează',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: const Text('Salvează', style: TextStyle(color: Colors.white)),
               ),
             ],
           );
         },
-      ),
-    );
-  }
-
-  void _showBulkHomeworkDialog() {
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF1A1F26),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Temă pentru ${_selectedStudents.length} elevi',
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Titlu temă',
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                filled: true,
-                fillColor: const Color(0xFF0F1419),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descriptionController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Descriere',
-                hintStyle: TextStyle(color: Colors.grey[600]),
-                filled: true,
-                fillColor: const Color(0xFF0F1419),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final ids = _selectedStudents
-                  .map((s) => s.userId)
-                  .whereType<String>()
-                  .toList();
-              await widget.controller.createHomeworkForStudents(ids, {
-                'title': titleController.text,
-                'description': descriptionController.text,
-                'class_id': widget.schoolClass.id,
-              });
-              Get.back();
-              _selectedStudents.clear();
-              setState(() {});
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Trimite', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showQuickAttendanceDialog(StudentModel student) {
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: const Color(0xFF1A1F26),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Prezență: ${student.username}',
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate),
-              style: TextStyle(color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildAttendanceOption(
-                  'Prezent',
-                  Colors.green,
-                  Icons.check_circle,
-                  () async {
-                    final ids = [if (student.userId != null) student.userId!];
-                    if (ids.isEmpty) return;
-                    await widget.controller
-                        .markAttendanceForStudent(student.userId ?? '', {
-                          'status': 'present',
-                          'attendance_date': _selectedDate.toIso8601String(),
-                        });
-                    Get.back();
-                  },
-                ),
-                _buildAttendanceOption(
-                  'Absent',
-                  Colors.red,
-                  Icons.cancel,
-                  () async {
-                    final ids = [if (student.userId != null) student.userId!];
-                    if (ids.isEmpty) return;
-                    await widget.controller
-                        .markAttendanceForStudent(student.userId ?? '', {
-                          'status': 'present',
-                          'attendance_date': _selectedDate.toIso8601String(),
-                        });
-                    Get.back();
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceOption(
-    String label,
-    Color color,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showBulkAttendanceDialog() {
-    String status = 'present';
-
-    Get.dialog(
-      StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1A1F26),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Prezență pentru ${_selectedStudents.length} elevi',
-              style: const TextStyle(color: Colors.white),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate),
-                  style: TextStyle(color: Colors.grey[400]),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: status,
-                  dropdownColor: const Color(0xFF1A1F26),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: const Color(0xFF0F1419),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'present',
-                      child: Text(
-                        'Prezent',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'absent',
-                      child: Text(
-                        'Absent',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) =>
-                      setDialogState(() => status = v ?? 'present'),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Get.back(),
-                child: Text(
-                  'Anulează',
-                  style: TextStyle(color: Colors.grey[400]),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final ids = _selectedStudents
-                      .map((s) => s.userId)
-                      .whereType<String>()
-                      .toList();
-
-                  // În loc de bulk, mergem unul câte unul:
-                  final dateStr = _selectedDate.toIso8601String();
-                  final data = {'status': status, 'attendance_date': dateStr};
-
-                  for (final id in ids) {
-                    if (id.isNotEmpty) {
-                      await widget.controller.markAttendanceForStudent(
-                        id,
-                        data,
-                      );
-                    }
-                  }
-
-                  _selectedStudents.clear();
-                  setState(() {});
-                  Get.back();
-
-                  Get.snackbar(
-                    'Succes',
-                    'Prezența a fost actualizată pentru ${_selectedStudents.length} elevi',
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text(
-                  'Salvează',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// Quick Attendance Sheet Widget
-class _QuickAttendanceSheet extends StatelessWidget {
-  final List<StudentModel> students;
-  final DateTime selectedDate;
-  final VoidCallback onSelectDate;
-  final Function(String status) onMarkAll;
-  final Function(StudentModel student, String status) onMarkStudent;
-
-  const _QuickAttendanceSheet({
-    required this.students,
-    required this.selectedDate,
-    required this.onSelectDate,
-    required this.onMarkAll,
-    required this.onMarkStudent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              const Icon(Icons.checklist, color: Colors.green, size: 24),
-              const SizedBox(width: 12),
-              const Text(
-                'Prezență rapidă',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: onSelectDate,
-                icon: const Icon(Icons.calendar_today, size: 16),
-                label: Text(DateFormat('dd MMM', 'ro').format(selectedDate)),
-                style: TextButton.styleFrom(foregroundColor: Colors.blueAccent),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Quick actions
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickButton(
-                  'Toți prezenți',
-                  Colors.green,
-                  Icons.check_circle,
-                  () => onMarkAll('present'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuickButton(
-                  'Toți absenți',
-                  Colors.red,
-                  Icons.cancel,
-                  () => onMarkAll('absent'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Student list (max 5 visible)
-          Text(
-            'Sau marchează individual:',
-            style: TextStyle(color: Colors.grey[400], fontSize: 14),
-          ),
-          const SizedBox(height: 12),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 250),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                final student = students[index];
-                return _buildStudentAttendanceRow(student);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickButton(
-    String label,
-    Color color,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.4)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStudentAttendanceRow(StudentModel student) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252B35),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Colors.blueAccent.withOpacity(0.2),
-            child: Text(
-              (student.username.isNotEmpty
-                  ? student.username[0].toUpperCase()
-                  : '?'),
-              style: const TextStyle(
-                color: Colors.blueAccent,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              student.username,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          _buildSmallButton(
-            'P',
-            Colors.green,
-            () => onMarkStudent(student, 'present'),
-          ),
-          const SizedBox(width: 6),
-          _buildSmallButton(
-            'A',
-            Colors.red,
-            () => onMarkStudent(student, 'absent'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSmallButton(String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ),
       ),
     );
   }

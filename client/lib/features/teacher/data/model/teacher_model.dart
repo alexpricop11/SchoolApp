@@ -46,33 +46,54 @@ class TeacherModel extends Teacher {
   }
 }
 
+class SubjectRef {
+  final String id;
+  final String name;
+
+  const SubjectRef({required this.id, required this.name});
+
+  factory SubjectRef.fromJson(Map<String, dynamic> json) {
+    return SubjectRef(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
+}
+
 class SchoolClass {
   final String id;
   final String name;
   final List<TeacherModel> teachers;
   final List<StudentModel> students;
+  // NEW: subjects taught in this class (as returned by /teachers/me)
+  final List<SubjectRef> subjects;
 
   SchoolClass({
     required this.id,
     required this.name,
     List<TeacherModel>? teachers,
     List<StudentModel>? students,
-  }) : teachers = teachers ?? const [],
-       students = students ?? const [];
+    List<SubjectRef>? subjects,
+  })  : teachers = teachers ?? const [],
+        students = students ?? const [],
+        subjects = subjects ?? const [];
 
   factory SchoolClass.fromJson(Map<String, dynamic> json) {
     return SchoolClass(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       teachers: json['teachers'] != null
-          ? (json['teachers'] as List)
-                .map((t) => TeacherModel.fromJson(t))
-                .toList()
+          ? (json['teachers'] as List).map((t) => TeacherModel.fromJson(t)).toList()
           : [],
       students: json['students'] != null
-          ? (json['students'] as List)
-                .map((s) => StudentModel.fromJson(s))
-                .toList()
+          ? (json['students'] as List).map((s) => StudentModel.fromJson(s)).toList()
+          : [],
+      subjects: json['subjects'] != null
+          ? (json['subjects'] as List)
+              .map((s) => SubjectRef.fromJson(Map<String, dynamic>.from(s)))
+              .toList()
           : [],
     );
   }
@@ -83,6 +104,7 @@ class SchoolClass {
       'name': name,
       'teachers': teachers.map((t) => t.toJson()).toList(),
       'students': students.map((s) => s.toJson()).toList(),
+      'subjects': subjects.map((s) => s.toJson()).toList(),
     };
   }
 }

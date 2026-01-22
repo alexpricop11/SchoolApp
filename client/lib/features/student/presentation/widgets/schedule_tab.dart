@@ -394,26 +394,6 @@ class _ScheduleTabState extends State<ScheduleTab> {
                         ),
                     ],
                   ),
-                  if (schedule.room != null) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: Colors.grey[400],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'room_label'.trParams({'room': schedule.room!}),
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

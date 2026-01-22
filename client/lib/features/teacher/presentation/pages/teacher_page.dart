@@ -87,3 +87,6 @@ class TeacherDashboardPage extends StatelessWidget {
     );
   }
 }
+
+// Ensure navigation to class uses ClassDetailsPage -> StudentsCatalog already.
+// No change if already present.

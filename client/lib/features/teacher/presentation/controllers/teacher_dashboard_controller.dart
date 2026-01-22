@@ -82,7 +82,9 @@ class TeacherDashboardController extends GetxController {
   Future<void> fetchCurrentTeacher() async {
     isLoading.value = true;
     try {
+      print('👨‍🏫 [TeacherDashboard] fetchCurrentTeacher() start');
       final token = await SecureStorageService.getToken();
+      print('👨‍🏫 [TeacherDashboard] tokenPresent=${token != null}');
       if (token == null) {
         errorMessage.value = 'No token available';
         _redirectToLogin();
@@ -90,8 +92,37 @@ class TeacherDashboardController extends GetxController {
       }
 
       final fetchedTeacher = await getCurrentTeacherUseCase.call(token);
+      print('👨‍🏫 [TeacherDashboard] fetchedTeacher id=${fetchedTeacher.id} username=${fetchedTeacher.username}');
       teacher.value = fetchedTeacher;
-      classes.value = fetchedTeacher.classes ?? [];
+
+      // IMPORTANT: teaching classes (with subjects) are authoritative for catalog
+      try {
+        final ds = GetIt.instance.get<TeacherRemoteDataSource>();
+        final teaching = await ds.getMyTeachingClasses(token);
+        print('👨‍🏫 [TeacherDashboard] teachingClassesCount=${teaching.length}');
+        classes.value = teaching;
+      } catch (e) {
+        // fallback to whatever /teachers/me delivered
+        print('👨‍🏫 [TeacherDashboard] getMyTeachingClasses failed, fallback to /teachers/me classes. error=$e');
+        classes.value = fetchedTeacher.classes ?? [];
+      }
+
+      print('👨‍🏫 [TeacherDashboard] classesCount=${classes.length}');
+
+      // Seed subject cache from classes[].subjects
+      for (final c in classes) {
+        print('📚 [TeacherDashboard] class=${c.id} name=${c.name} subjectsFromAPI=${c.subjects.length}');
+        final subs = c.subjects
+            .where((s) => s.id.isNotEmpty)
+            .map((s) => {'id': s.id, 'name': s.name})
+            .toList();
+        if (subs.isNotEmpty) {
+          subjectsByClassId[c.id] = subs;
+          if (subs.length == 1 && (selectedSubjectByClassId[c.id]?['id'] ?? '').isEmpty) {
+            selectedSubjectByClassId[c.id] = subs.first;
+          }
+        }
+      }
 
       // Extract all students from classes
       final students = <StudentModel>[];
@@ -99,14 +130,18 @@ class TeacherDashboardController extends GetxController {
         students.addAll(schoolClass.students);
       }
       allStudents.value = students;
+      print('👨‍🏫 [TeacherDashboard] allStudentsCount=${allStudents.length}');
 
       // Fetch initial data
       if (teacher.value != null) {
+        print('👨‍🏫 [TeacherDashboard] fetching grades + schedule...');
         await Future.wait([fetchTeacherGrades(), fetchTeacherSchedule()]);
+        print('👨‍🏫 [TeacherDashboard] after fetchTeacherSchedule: teacherSchedules=${teacherSchedules.length} schedules=${schedules.length}');
       }
+      print('👨‍🏫 [TeacherDashboard] fetchCurrentTeacher() done');
     } on DioException catch (e) {
       errorMessage.value = 'Error fetching teacher: $e';
-      print('Error fetching teacher: $e');
+      print('👨‍🏫 [TeacherDashboard] Error fetching teacher: $e');
       // Check if it's a 401 error - the interceptor should handle this
       // but if somehow it slips through, handle it here too
       if (e.response?.statusCode == 401) {
@@ -114,7 +149,7 @@ class TeacherDashboardController extends GetxController {
       }
     } catch (e) {
       errorMessage.value = 'Error fetching teacher: $e';
-      print('Error fetching teacher: $e');
+      print('👨‍🏫 [TeacherDashboard] Error fetching teacher: $e');
     } finally {
       isLoading.value = false;
     }
@@ -529,59 +564,87 @@ class TeacherDashboardController extends GetxController {
     }
   }
 
-  // ==================== TEACHER SCHEDULE ====================
+  // ==================== SUBJECTS (per class) ====================
+  /// Cache: classId -> list of subjects taught by this teacher in that class.
+  final subjectsByClassId = <String, List<Map<String, String>>>{}.obs;
+
+  /// Cache: classId -> selected subject {id,name} (used by catalog actions).
+  final selectedSubjectByClassId = <String, Map<String, String>>{}.obs;
+
+  /// Convenience list for UI that expects `teacherSchedules`.
   final teacherSchedules = <Schedule>[].obs;
-  final isLoadingTeacherSchedule = false.obs;
 
   Future<void> fetchTeacherSchedule() async {
-    if (teacher.value == null) return;
-
-    isLoadingTeacherSchedule.value = true;
+    if (teacher.value == null) {
+      print('🗓️ [TeacherDashboard] fetchTeacherSchedule() skipped (teacher=null)');
+      return;
+    }
+    isLoadingSchedule.value = true;
     try {
       final token = await SecureStorageService.getToken();
+      print('🗓️ [TeacherDashboard] fetchTeacherSchedule() teacherId=${teacher.value!.id} tokenPresent=${token != null}');
       if (token == null) return;
 
-      // Directly fetch teacher's schedule from the new endpoint
-      final allSchedules = await scheduleDataSource.getTeacherSchedule(
-        teacher.value!.id,
-        token,
-      );
+      final fetched = await scheduleDataSource.getTeacherSchedule(teacher.value!.id, token);
+      print('🗓️ [TeacherDashboard] fetchTeacherSchedule() fetchedCount=${fetched.length}');
 
-      // Sort by day of week and period number
-      allSchedules.sort((a, b) {
-        final dayOrder = a.dayOfWeek.index.compareTo(b.dayOfWeek.index);
-        if (dayOrder != 0) return dayOrder;
-        return a.periodNumber.compareTo(b.periodNumber);
-      });
-
-      teacherSchedules.value = allSchedules;
-    } catch (e) {
-      print('Error fetching teacher schedule: $e');
+      schedules.value = fetched;
+      teacherSchedules.value = fetched;
+    } catch (e, st) {
+      print('🗓️ [TeacherDashboard] Error fetching teacher schedule: $e');
+      print('🗓️ [TeacherDashboard] Stack: $st');
     } finally {
-      isLoadingTeacherSchedule.value = false;
+      isLoadingSchedule.value = false;
     }
   }
 
+  // ==================== DASHBOARD COMPUTED STATS ====================
+  int get totalClasses => classes.length;
+
+  int get totalStudents {
+    final ids = <String>{};
+    for (final c in classes) {
+      for (final s in c.students) {
+        final id = (s.userId ?? '').toString();
+        if (id.isNotEmpty) ids.add(id);
+      }
+    }
+    return ids.length;
+  }
+
+  int get totalGrades => grades.length;
+
+  int get gradesThisWeek {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    return grades.where((g) => g.createdAt.isAfter(startOfWeek)).length;
+  }
+
+  int get absencesToday {
+    final today = DateTime.now();
+    bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+    return attendanceList.where((a) => a.status.toString().toLowerCase().contains('absent') && sameDay(a.attendanceDate, today)).length;
+  }
+
+  int get lessonsToday => todaySchedule.length;
+
+  // ==================== SCHEDULE HELPERS ====================
   DayOfWeek getTodayEnum() {
-    switch (DateTime
-        .now()
-        .weekday) {
-      case 1:
+    switch (DateTime.now().weekday) {
+      case DateTime.monday:
         return DayOfWeek.monday;
-      case 2:
+      case DateTime.tuesday:
         return DayOfWeek.tuesday;
-      case 3:
+      case DateTime.wednesday:
         return DayOfWeek.wednesday;
-      case 4:
+      case DateTime.thursday:
         return DayOfWeek.thursday;
-      case 5:
+      case DateTime.friday:
         return DayOfWeek.friday;
-      case 6:
+      case DateTime.saturday:
         return DayOfWeek.saturday;
-      case 7:
-        return DayOfWeek.sunday;
       default:
-        return DayOfWeek.monday;
+        return DayOfWeek.sunday;
     }
   }
 
@@ -606,357 +669,227 @@ class TeacherDashboardController extends GetxController {
 
   List<Schedule> get todaySchedule {
     final today = getTodayEnum();
-    return teacherSchedules.where((s) => s.dayOfWeek == today).toList()
-      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
-  }
-
-  Schedule? get nextLesson {
-    final now = DateTime.now();
-    final today = getTodayEnum();
-
-    final todayLessons =
-    teacherSchedules.where((s) => s.dayOfWeek == today).toList()
-      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
-
-    for (var schedule in todayLessons) {
-      final lessonTime = _parseTime(schedule.startTime);
-      if (lessonTime.isAfter(now)) {
-        return schedule;
-      }
-    }
-    return null;
+    final list = List<Schedule>.from(teacherSchedules.where((s) => s.dayOfWeek == today));
+    list.sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+    return list;
   }
 
   Schedule? get currentLesson {
-    final now = DateTime.now();
-    final today = getTodayEnum();
+    final now = TimeOfDay.now();
+    DateTime parseToday(String hhmm) {
+      final parts = hhmm.split(':');
+      final h = int.tryParse(parts.first) ?? 0;
+      final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+      final d = DateTime.now();
+      return DateTime(d.year, d.month, d.day, h, m);
+    }
 
-    final todayLessons =
-    teacherSchedules.where((s) => s.dayOfWeek == today).toList()
-      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
-
-    for (var schedule in todayLessons) {
-      final startTime = _parseTime(schedule.startTime);
-      final endTime = _parseTime(schedule.endTime);
-      if (now.isAfter(startTime) && now.isBefore(endTime)) {
-        return schedule;
-      }
+    for (final s in todaySchedule) {
+      final start = parseToday(s.startTime);
+      final end = parseToday(s.endTime);
+      final cur = parseToday('${now.hour}:${now.minute}');
+      if (cur.isAfter(start) && cur.isBefore(end)) return s;
     }
     return null;
   }
 
-  DateTime _parseTime(String timeString) {
-    final parts = timeString.split(':');
-    final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
-  }
-
-  String getTimeUntilLesson(Schedule? lesson) {
-    if (lesson == null) return '';
-    final lessonTime = _parseTime(lesson.startTime);
-    final now = DateTime.now();
-    final difference = lessonTime.difference(now);
-
-    if (difference.isNegative) return 'Acum';
-    if (difference.inMinutes < 60) {
-      return 'în ${difference.inMinutes}m';
-    } else if (difference.inHours < 24) {
-      return 'în ${difference.inHours}h ${difference.inMinutes % 60}m';
-    } else {
-      return 'în ${difference.inDays}z';
+  Schedule? get nextLesson {
+    final now = TimeOfDay.now();
+    DateTime parseToday(String hhmm) {
+      final parts = hhmm.split(':');
+      final h = int.tryParse(parts.first) ?? 0;
+      final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+      final d = DateTime.now();
+      return DateTime(d.year, d.month, d.day, h, m);
     }
+
+    final cur = parseToday('${now.hour}:${now.minute}');
+    for (final s in todaySchedule) {
+      final start = parseToday(s.startTime);
+      if (start.isAfter(cur)) return s;
+    }
+    return null;
   }
 
-  List<Schedule> getScheduleForDay(DayOfWeek day) {
-    return teacherSchedules.where((s) => s.dayOfWeek == day).toList()
-      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+  String getTimeUntilLesson(Schedule lesson) {
+    DateTime parseToday(String hhmm) {
+      final parts = hhmm.split(':');
+      final h = int.tryParse(parts.first) ?? 0;
+      final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+      final d = DateTime.now();
+      return DateTime(d.year, d.month, d.day, h, m);
+    }
+
+    final start = parseToday(lesson.startTime);
+    final now = DateTime.now();
+    final diff = start.difference(now);
+    if (diff.isNegative) return 'În desfășurare';
+    final mins = diff.inMinutes;
+    if (mins < 60) return '${mins}m';
+    return '${diff.inHours}h ${mins % 60}m';
   }
 
   String getClassName(String classId) {
-    final schoolClass = classes.firstWhereOrNull((c) => c.id == classId);
-    return schoolClass?.name ?? 'Necunoscut';
+    final cls = classes.firstWhereOrNull((c) => c.id == classId);
+    return cls?.name ?? classId;
   }
 
-  /// Returns the best-known subject name for a given class.
-  ///
-  /// Source of truth: teacher schedule items (they often include subjectName).
-  String? getSubjectNameForClass(String classId) {
-    try {
-      final match = teacherSchedules.firstWhereOrNull(
-            (s) =>
-        s.classId == classId && (s.subjectName
-            ?.trim()
-            .isNotEmpty ?? false),
-      );
-      if (match != null) return match.subjectName;
-
-      // Fallback: any schedule entry for that class
-      final any = teacherSchedules.firstWhereOrNull((s) =>
-      s.classId == classId);
-      return any?.subjectName;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Try to resolve subject_id for attendance/homework actions.
-  ///
-  /// If schedule is present, we can pick the subjectId from it.
+  // ==================== SUBJECT RESOLUTION ====================
   Future<String?> resolveSubjectIdForClass(String classId) async {
-    // Prefer current/next lesson if it matches the class
-    final current = currentLesson;
-    if (current != null && current.classId == classId) {
-      return current.subjectId;
+    // Ensure cache is loaded from backend endpoint first.
+    if ((subjectsByClassId[classId] ?? const []).isEmpty) {
+      await fetchMySubjectsForClass(classId);
     }
-
-    final next = nextLesson;
-    if (next != null && next.classId == classId) {
-      return next.subjectId;
-    }
-
-    final any = teacherSchedules.firstWhereOrNull((s) => s.classId == classId);
-    return any?.subjectId;
+    return getSubjectIdForClass(classId);
   }
 
-  /// Synchronous helper used by some widgets.
-  ///
-  /// Best-effort: tries to return a subjectId for the class from loaded schedules.
-  /// If none is available yet, returns null.
+  List<Map<String, String>> getSubjectsForClass(String classId) {
+    final cached = subjectsByClassId[classId];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    final cls = classes.firstWhereOrNull((c) => c.id == classId);
+    if (cls != null && cls.subjects.isNotEmpty) {
+      return cls.subjects
+          .where((s) => s.id.isNotEmpty)
+          .map((s) => {'id': s.id, 'name': s.name})
+          .toList();
+    }
+
+    // Final fallback: infer from teacher schedule using subjectId/subjectName.
+    final fromTeacherSched = teacherSchedules
+        .where((sch) => sch.classId == classId && sch.subjectId.isNotEmpty)
+        .map((sch) => {'id': sch.subjectId, 'name': sch.subjectName ?? ''})
+        .toList();
+
+    final map = <String, Map<String, String>>{};
+    for (final s in fromTeacherSched) {
+      final id = s['id'] ?? '';
+      if (id.isEmpty) continue;
+      map[id] = s;
+    }
+    return map.values.toList();
+  }
+
+  // ==================== BULK / HELPERS USED BY StudentsCatalog ====================
+  Future<void> createGradesForStudents({
+    required List<String> studentIds,
+    required int value,
+    required String type,
+    required String classId,
+    required String subjectId,
+    DateTime? date,
+  }) async {
+    for (final sid in studentIds) {
+      await createGrade({
+        'value': value,
+        'types': type,
+        'student_id': sid,
+        'teacher_id': teacher.value?.id,
+        'subject_id': subjectId,
+        'created_at': (date ?? DateTime.now()).toIso8601String(),
+      });
+    }
+  }
+
+  Future<void> createHomeworkForStudents({
+    required List<String> studentIds,
+    required String classId,
+    required String subjectId,
+    required String title,
+    required String description,
+    required DateTime dueDate,
+  }) async {
+    final payload = {
+      'title': title,
+      'description': description,
+      'due_date': dueDate.toIso8601String(),
+      // align with backend enum
+      'status': 'pending',
+      'subject_id': subjectId,
+      'class_id': classId,
+      'teacher_id': teacher.value?.id,
+      // NEW: personal homework if not empty
+      if (studentIds.isNotEmpty) 'student_ids': studentIds,
+    };
+
+    await createHomework(payload);
+  }
+
+  Future<void> markAttendanceForStudent({
+    required String studentId,
+    required String subjectId,
+    required DateTime date,
+    required String status,
+    String? notes,
+  }) async {
+    await createAttendance({
+      'attendance_date': date.toIso8601String(),
+      'status': status,
+      'notes': notes,
+      'student_id': studentId,
+      'subject_id': subjectId,
+      'teacher_id': teacher.value?.id,
+    });
+  }
+
+  void setSelectedSubjectForClass(
+    String classId, {
+    required String subjectId,
+    required String subjectName,
+  }) {
+    selectedSubjectByClassId[classId] = {
+      'id': subjectId,
+      'name': subjectName,
+    };
+  }
+
   String? getSubjectIdForClass(String classId) {
-    final current = currentLesson;
-    if (current != null && current.classId == classId) return current.subjectId;
+    final sel = selectedSubjectByClassId[classId];
+    final id = sel?['id'];
+    if (id != null && id.isNotEmpty) return id;
 
-    final next = nextLesson;
-    if (next != null && next.classId == classId) return next.subjectId;
-
-    final any = teacherSchedules.firstWhereOrNull((s) => s.classId == classId);
-    return any?.subjectId;
+    final subs = getSubjectsForClass(classId);
+    if (subs.length == 1) return subs.first['id'];
+    return null;
   }
 
-  // ==================== STATISTICS ====================
-  int get totalClasses => classes.length;
+  String? getSubjectNameForClass(String classId) {
+    final sel = selectedSubjectByClassId[classId];
+    final name = sel?['name'];
+    if (name != null && name.trim().isNotEmpty) return name;
 
-  int get totalStudents => allStudents.length;
-
-  int get totalGrades => grades.length;
-
-  int get gradesThisWeek {
-    return grades.length;
+    final subs = getSubjectsForClass(classId);
+    if (subs.length == 1) return subs.first['name'];
+    return null;
   }
 
-  int get lessonsToday => todaySchedule.length;
+  // Alias used by TeacherSchedulePage
+  RxBool get isLoadingTeacherSchedule => isLoadingSchedule;
 
-  // Get absences today
-  int get absencesToday {
-    final today = DateTime.now();
-    return attendanceList
-        .where(
-          (att) =>
-      att.attendanceDate.year == today.year &&
-          att.attendanceDate.month == today.month &&
-          att.attendanceDate.day == today.day &&
-          att.status == AttendanceStatus.absent,
-    )
-        .length;
-  }
-
-  // Bulk operations for UI
-  Future<void> createHomeworkForStudents(
-    List<String> studentIds,
-    Map<String, dynamic> homeworkData,
-  ) async {
-    if (teacher.value == null) return;
-    isLoadingHomework.value = true;
+  // ==================== SUBJECT FETCH (backend) ====================
+  Future<List<Map<String, String>>> fetchMySubjectsForClass(String classId) async {
     try {
-      final token = await SecureStorageService.getToken();
-      if (token == null) return;
-
-      // Build payloads
-      final homeworkList = studentIds.map((studentId) {
-        final data = Map<String, dynamic>.from(homeworkData);
-        data['student_id'] = studentId;
-        data['teacher_id'] = data['teacher_id'] ?? teacher.value!.id;
-        return data;
-      }).toList();
-
-      // Try bulk endpoint first; if offline, queue individually so SyncManager can send.
-      int queued = 0;
-      try {
-        await homeworkDataSource.createHomeworkBulk(homeworkList, token);
-      } catch (e) {
-        for (final item in homeworkList) {
-          final res = await offlineHandler.run(
-            opType: OperationType.create,
-            entity: 'homework',
-            payload: Map<String, dynamic>.from(item),
-            remoteCall: () => homeworkDataSource.createHomework(item, token),
-          );
-          if (res == null) queued++;
-        }
-      }
-
-      if (queued == 0) {
-        await fetchClassHomework(homeworkData['class_id']?.toString() ?? '');
-        Get.snackbar(
-          'Succes',
-          'Teme create pentru ${studentIds.length} elevi',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      } else {
-        Get.snackbar(
-          'Offline',
-          'Temele au fost salvate local ($queued) și vor fi trimise automat când revine serverul.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Eroare',
-        'Eroare la crearea temelor: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } finally {
-      isLoadingHomework.value = false;
-    }
-  }
-
-  Future<void> markAttendanceForStudent(
-    String studentId,
-    Map<String, dynamic> attendanceData,
-  ) async {
-    isLoadingAttendance.value = true;
-
-    try {
+      print('🔍 [TeacherDashboard] fetchMySubjectsForClass($classId)');
       final token = await SecureStorageService.getToken();
       if (token == null) {
-        Get.snackbar('Eroare', 'Nu există token de autentificare');
-        return;
+        print('🔍 [TeacherDashboard] fetchMySubjectsForClass -> no token');
+        return [];
       }
 
-      final data = Map<String, dynamic>.from(attendanceData);
-      data['student_id'] = studentId;
-      data['teacher_id'] = data['teacher_id'] ?? teacher.value?.id;
+      final ds = GetIt.instance.get<TeacherRemoteDataSource>();
+      final subjects = await ds.getMySubjectsForClass(classId, token);
+      final mapped = subjects
+          .where((s) => s.id.isNotEmpty)
+          .map((s) => {'id': s.id, 'name': s.name})
+          .toList();
 
-      // If subject_id missing, try to resolve from schedule.
-      if (data['subject_id'] == null || data['subject_id'].toString().trim().isEmpty) {
-        final subjectId = getSubjectIdForClass(data['class_id']?.toString() ?? '') ??
-            await resolveSubjectIdForClass(data['class_id']?.toString() ?? '');
-        if (subjectId != null) {
-          data['subject_id'] = subjectId;
-        }
-      }
-
-      // Normalize date
-      final dateValue = data['attendance_date'];
-      if (dateValue is DateTime) {
-        data['attendance_date'] = DateFormat('yyyy-MM-dd').format(dateValue);
-      } else if (dateValue is String) {
-        try {
-          final dt = DateTime.parse(dateValue);
-          data['attendance_date'] = DateFormat('yyyy-MM-dd').format(dt);
-        } catch (_) {
-          data['attendance_date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
-        }
-      } else if (dateValue == null) {
-        data['attendance_date'] = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      }
-
-      final res = await offlineHandler.run(
-        opType: OperationType.create,
-        entity: 'attendance',
-        payload: Map<String, dynamic>.from(data),
-        remoteCall: () => attendanceDataSource.createAttendance(data, token),
-      );
-
-      if (res != null) {
-        Get.snackbar(
-          'Succes',
-          'Prezența a fost înregistrată',
-          backgroundColor: Colors.green[800],
-        );
-      } else {
-        Get.snackbar(
-          'Offline',
-          'Prezența a fost salvată local și va fi sincronizată automat.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Eroare',
-        'Nu s-a putut înregistra: ${e.toString().split('\n').first}',
-        backgroundColor: Colors.red[800],
-      );
-    } finally {
-      isLoadingAttendance.value = false;
-    }
-  }
-
-  Future<void> createGradesForStudents(
-    List<String> studentIds,
-    Map<String, dynamic> baseGradeData,
-  ) async {
-    try {
-      final token = await SecureStorageService.getToken();
-      if (token == null) return;
-
-      int queued = 0;
-      int sent = 0;
-
-      for (final studentId in studentIds) {
-        final gradeData = Map<String, dynamic>.from(baseGradeData);
-        gradeData['student_id'] = studentId;
-        gradeData['teacher_id'] = teacher.value?.id;
-
-        final res = await offlineHandler.run(
-          opType: OperationType.create,
-          entity: 'grade',
-          payload: Map<String, dynamic>.from(gradeData),
-          remoteCall: () => gradeDataSource.createGrade(gradeData, token),
-        );
-
-        if (res == null) {
-          queued++;
-        } else {
-          sent++;
-        }
-      }
-
-      if (teacher.value != null && sent > 0) {
-        await fetchTeacherGrades();
-      }
-
-      if (queued > 0 && sent == 0) {
-        Get.snackbar(
-          'Offline',
-          'Notele au fost salvate local ($queued) și vor fi trimise automat.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      } else if (queued > 0 && sent > 0) {
-        Get.snackbar(
-          'Parțial',
-          'Trimise: $sent, salvate offline: $queued. Se vor sincroniza când revine serverul.',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      } else {
-        Get.snackbar(
-          'Succes',
-          'Note create cu succes!',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Eroare',
-        'Eroare la crearea notelor: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      print('🔍 [TeacherDashboard] fetchMySubjectsForClass -> ${mapped.length} subjects');
+      subjectsByClassId[classId] = mapped;
+      return mapped;
+    } catch (e, st) {
+      print('🔍 [TeacherDashboard] fetchMySubjectsForClass error: $e');
+      print('🔍 [TeacherDashboard] stack: $st');
+      return [];
     }
   }
 }

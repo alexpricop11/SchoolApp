@@ -1,1 +1,1 @@
-from .models import Homework, HomeworkStatus
+from .models import Homework, HomeworkStatus, HomeworkAssignment

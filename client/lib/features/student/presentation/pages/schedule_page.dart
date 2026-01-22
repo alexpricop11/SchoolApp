@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/services/secure_storage_service.dart';
 import '../../data/datasource/student_data_api.dart';
 import '../../data/model/schedule_model.dart';
+import '../../data/model/homework_model.dart';
 
 class SchedulePage extends StatefulWidget {
   const SchedulePage({super.key});
@@ -16,6 +15,7 @@ class SchedulePage extends StatefulWidget {
 class _SchedulePageState extends State<SchedulePage> {
   StudentDataApi? _api;
   List<ScheduleModel> _schedules = [];
+  List<HomeworkModel> _homework = [];
   bool _isLoading = true;
   int _selectedDay = DateTime.now().weekday - 1;
 
@@ -43,8 +43,10 @@ class _SchedulePageState extends State<SchedulePage> {
     }
 
     final schedules = await _api!.getClassSchedule(student.classId);
+    final homework = await _api!.getClassHomework(student.classId);
     setState(() {
       _schedules = schedules;
+      _homework = homework;
       _isLoading = false;
     });
   }
@@ -54,9 +56,19 @@ class _SchedulePageState extends State<SchedulePage> {
       ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
   }
 
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
   @override
   Widget build(BuildContext context) {
-    final daySchedule = _getScheduleForDay(_days[_selectedDay]);
+    final dayKey = _days[_selectedDay];
+    final daySchedule = _getScheduleForDay(dayKey);
+
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final selectedDate = DateTime(monday.year, monday.month, monday.day).add(Duration(days: _selectedDay));
+
+    final dayHomework = _homework.where((h) => _sameDay(h.dueDate, selectedDate)).toList()
+      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
     return Scaffold(
       appBar: AppBar(
@@ -103,80 +115,125 @@ class _SchedulePageState extends State<SchedulePage> {
                 ? Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _loadSchedule,
-                    child: daySchedule.isEmpty
+                    child: daySchedule.isEmpty && dayHomework.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.calendar_today, size: 64, color: Colors.white24),
                                 SizedBox(height: 16),
-                                Text('Nu există ore pentru această zi',
+                                Text('Nu există ore/teme pentru această zi',
                                     style: TextStyle(color: Colors.white70, fontSize: 16)),
                               ],
                             ),
                           )
-                        : ListView.builder(
+                        : ListView(
                             padding: EdgeInsets.all(16),
-                            itemCount: daySchedule.length,
-                            itemBuilder: (context, index) {
-                              final schedule = daySchedule[index];
-                              return Container(
-                                margin: EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [Color(0xFF1A1C20), Color(0xFF111827)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                ),
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.all(16),
-                                  leading: Container(
-                                    width: 50,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.blue, width: 2),
+                            children: [
+                              // Timetable
+                              ...daySchedule.map((schedule) {
+                                return Container(
+                                  margin: EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [Color(0xFF1A1C20), Color(0xFF111827)],
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        schedule.periodNumber.toString(),
-                                        style: TextStyle(
-                                          color: Colors.blue,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                  ),
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.all(16),
+                                    leading: Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.blue, width: 2),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          schedule.periodNumber.toString(),
+                                          style: TextStyle(
+                                            color: Colors.blue,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  title: Text(
-                                    schedule.subjectName,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      SizedBox(height: 4),
-                                      Text(
-                                        '${schedule.startTime} - ${schedule.endTime}',
-                                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                                    title: Text(
+                                      schedule.subjectName,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      if (schedule.room != null)
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(height: 4),
                                         Text(
-                                          'Sala: ${schedule.room}',
-                                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                                          '${schedule.startTime} - ${schedule.endTime}',
+                                          style: TextStyle(color: Colors.white70, fontSize: 14),
                                         ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                  trailing: Icon(Icons.arrow_forward_ios, color: Colors.white30, size: 16),
+                                );
+                              }),
+
+                              // Homework section
+                              if (dayHomework.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Teme pentru acasă',
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
-                              );
-                            },
+                                const SizedBox(height: 10),
+                                ...dayHomework.map((hw) {
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF111827),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(color: Colors.white10),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 42,
+                                          height: 42,
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withOpacity(0.18),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: const Icon(Icons.assignment, color: Colors.orange, size: 22),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(hw.subjectName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                                              const SizedBox(height: 4),
+                                              Text(hw.title, style: TextStyle(color: Colors.grey[300])),
+                                              if ((hw.description ?? '').isNotEmpty) ...[
+                                                const SizedBox(height: 6),
+                                                Text(hw.description!, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                                              ]
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
                           ),
                   ),
           ),

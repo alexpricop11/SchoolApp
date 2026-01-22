@@ -17,19 +17,40 @@ class ScheduleRemoteDataSourceImpl implements ScheduleRemoteDataSource {
 
   @override
   Future<List<ScheduleModel>> getClassSchedule(String classId, String token) async {
+    print('🗓️ [ScheduleDS] GET /schedules/class/$classId');
     final response = await dio.get(
       '/schedules/class/$classId',
       options: AuthOptions.bearer(token),
     );
+    print('🗓️ [ScheduleDS] status=${response.statusCode}');
+    final data = response.data;
+    print('🗓️ [ScheduleDS] dataType=${data.runtimeType}');
+    if (data is List) {
+      print('🗓️ [ScheduleDS] items=${data.length}');
+    } else {
+      print('🗓️ [ScheduleDS] data=$data');
+    }
     return (response.data as List).map((json) => ScheduleModel.fromJson(json)).toList();
   }
 
   @override
   Future<List<ScheduleModel>> getTeacherSchedule(String teacherId, String token) async {
+    print('🗓️ [ScheduleDS] GET /schedules/teacher/$teacherId');
     final response = await dio.get(
       '/schedules/teacher/$teacherId',
       options: AuthOptions.bearer(token),
     );
+    print('🗓️ [ScheduleDS] status=${response.statusCode}');
+    final data = response.data;
+    print('🗓️ [ScheduleDS] dataType=${data.runtimeType}');
+    if (data is List) {
+      print('🗓️ [ScheduleDS] items=${data.length}');
+      if (data.isNotEmpty) {
+        print('🗓️ [ScheduleDS] first=${data.first}');
+      }
+    } else {
+      print('🗓️ [ScheduleDS] data=$data');
+    }
     return (response.data as List).map((json) => ScheduleModel.fromJson(json)).toList();
   }
 

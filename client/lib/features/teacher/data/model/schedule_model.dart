@@ -17,6 +17,8 @@ class ScheduleModel extends Schedule {
   });
 
   factory ScheduleModel.fromJson(Map<String, dynamic> json) {
+    final subjectId = (json['subject_id'] ?? json['subject']?['id'] ?? '').toString();
+    final teacherId = (json['teacher_id'] ?? json['teacher']?['user_id'] ?? json['teacher']?['id'] ?? '').toString();
     return ScheduleModel(
       id: json['id'] ?? '',
       dayOfWeek: _dayFromString(json['day_of_week']),
@@ -26,9 +28,9 @@ class ScheduleModel extends Schedule {
       room: json['room'],
       classId: json['class_id'] ?? '',
       className: json['class_']?['name'],
-      subjectId: json['subject_id'] ?? '',
+      subjectId: subjectId,
       subjectName: json['subject']?['name'],
-      teacherId: json['teacher_id'] ?? '',
+      teacherId: teacherId,
       createdAt: DateTime.parse(json['created_at']),
     );
   }

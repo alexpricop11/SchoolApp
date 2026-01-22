@@ -31,6 +31,13 @@ class ClassOut(ClassBase):
     model_config = {"from_attributes": True}
 
 
+class SubjectSlim(BaseModel):
+    id: UUID
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class ClassSlim(BaseModel):
     """Lightweight class representation for embedding in other schemas."""
 
@@ -38,5 +45,7 @@ class ClassSlim(BaseModel):
     name: str
     school_id: UUID
     teacher_id: Optional[UUID] = None
+    subjects: list[SubjectSlim] = []
 
     model_config = {"from_attributes": True}
+

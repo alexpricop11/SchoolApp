@@ -73,9 +73,6 @@ class ConnectivityManager {
     if (ApiHealthService.isApiDown) return false;
 
     const candidates = <String>[
-      '/health',
-      '/openapi.json',
-      '/docs',
       '/',
     ];
 

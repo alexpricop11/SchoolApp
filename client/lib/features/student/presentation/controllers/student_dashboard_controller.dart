@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../data/datasource/student_data_api.dart';
 import '../../data/model/student.dart';
@@ -8,6 +8,8 @@ import '../../data/model/homework_model.dart';
 import '../../data/model/attendance_model.dart';
 import '../../data/model/schedule_model.dart';
 import '../../data/model/notification_model.dart';
+import '../../../../core/services/websocket_service.dart';
+import '../../../../core/services/cache_service.dart';
 
 class StudentDashboardController extends GetxController {
   // Navigation
@@ -32,10 +34,74 @@ class StudentDashboardController extends GetxController {
   // API
   StudentDataApi? _api;
 
+  // WebSocket
+  final WebSocketService _ws = WebSocketService.instance;
+
   @override
   void onInit() {
     super.onInit();
     _initializeAndFetch();
+    _initWebSocketListeners();
+  }
+
+  @override
+  void onClose() {
+    _ws.disconnect();
+    super.onClose();
+  }
+
+  void _initWebSocketListeners() {
+    _ws.connect();
+
+    _ws.messageStream.listen((msg) async {
+      if (msg.type == NotificationType.grade ||
+          msg.type == NotificationType.homework ||
+          msg.type == NotificationType.attendance) {
+        try {
+          await CacheService.clearCache('grades_cache');
+          await CacheService.clearCache('notifications_cache');
+          await CacheService.clearCache('homework_cache');
+          await CacheService.clearCache('attendance_cache');
+        } catch (_) {}
+
+        await fetchGrades(forceRefresh: true);
+        await fetchHomework(forceRefresh: true);
+        await fetchAttendance(forceRefresh: true);
+        await fetchNotifications(forceRefresh: true);
+
+        final notification = msg.data['notification'];
+        final title = (notification is Map && notification['title'] != null)
+            ? notification['title'].toString()
+            : (msg.type == NotificationType.homework
+                ? 'Temă nouă'
+                : msg.type == NotificationType.attendance
+                    ? 'Prezență'
+                    : 'Notă nouă');
+
+        final message = (notification is Map && notification['message'] != null)
+            ? notification['message'].toString()
+            : (msg.type == NotificationType.homework
+                ? 'Ai primit o temă nouă.'
+                : msg.type == NotificationType.attendance
+                    ? 'A fost înregistrată o absență/prezență.'
+                    : 'Ai primit o notă nouă.');
+
+        if (Get.isSnackbarOpen) {
+          Get.closeCurrentSnackbar();
+        }
+
+        Get.snackbar(
+          title,
+          message,
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.blueGrey.shade900,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }, onError: (e) {
+      debugPrint('WS student listener error: $e');
+    });
   }
 
   Future<void> _initializeAndFetch() async {
@@ -107,15 +173,9 @@ class StudentDashboardController extends GetxController {
   Future<void> fetchHomework({bool forceRefresh = false}) async {
     isLoadingHomework.value = true;
     try {
-      final classId = student.value?.classId;
-      if (classId != null && classId.isNotEmpty) {
-        final data = await _api?.getClassHomework(
-          classId,
-          forceRefresh: forceRefresh,
-        );
-        if (data != null) {
-          homework.value = data;
-        }
+      final data = await _api?.getMyHomework(forceRefresh: forceRefresh);
+      if (data != null) {
+        homework.value = data;
       }
     } catch (e) {
       debugPrint('Error fetching homework: $e');
@@ -182,12 +242,15 @@ class StudentDashboardController extends GetxController {
   }
 
   int get pendingHomeworkCount {
-    return homework.where((h) => h.status == 'pending').length;
+    return homework.length;
   }
 
   int get unreadNotificationsCount {
     return notifications.where((n) => !n.isRead).length;
   }
+
+  // New: alias used by some widgets
+  int get unreadNotifications => unreadNotificationsCount;
 
   List<HomeworkModel> get urgentHomework {
     final now = DateTime.now();
@@ -195,7 +258,6 @@ class StudentDashboardController extends GetxController {
     return homework
         .where(
           (h) =>
-              h.status == 'pending' &&
               h.dueDate.isBefore(threeDaysFromNow) &&
               h.dueDate.isAfter(now),
         )

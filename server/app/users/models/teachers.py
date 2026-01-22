@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.homework.models import Homework
     from app.attendance.models import Attendance
     from app.material.models import Material
+    from app.users.models.teacher_subjects import TeacherSubject, TeacherClassSubject
 
 
 class Teacher(Base):
@@ -52,3 +53,11 @@ class Teacher(Base):
     homeworks: Mapped[List["Homework"]] = relationship("Homework", back_populates="teacher", cascade="all, delete-orphan")
     attendances: Mapped[List["Attendance"]] = relationship("Attendance", back_populates="teacher", cascade="all, delete-orphan")
     materials: Mapped[List["Material"]] = relationship("Material", back_populates="teacher", cascade="all, delete-orphan")
+
+    # NEW: explicit subject associations
+    teacher_subjects: Mapped[List["TeacherSubject"]] = relationship(
+        "TeacherSubject", back_populates="teacher", cascade="all, delete-orphan"
+    )
+    teacher_class_subjects: Mapped[List["TeacherClassSubject"]] = relationship(
+        "TeacherClassSubject", back_populates="teacher", cascade="all, delete-orphan"
+    )

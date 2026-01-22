@@ -5,6 +5,7 @@ import '../widgets/home_tab.dart';
 import '../widgets/grades_tab.dart';
 import '../widgets/schedule_tab.dart';
 import '../widgets/profile_tab.dart';
+import 'student_notifications_page.dart';
 
 class StudentDashboardPage extends StatelessWidget {
   const StudentDashboardPage({super.key});

@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+
 from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from app.users.models import User
@@ -31,9 +33,9 @@ class UserRepository:
             email=str(user_create.email),
             role=user_create.role,
             school_id=user_create.school_id,
-            class_id=user_create.class_id,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
-        user.set_password(user_create.password)
         self.session.add(user)
         try:
             await self.session.commit()

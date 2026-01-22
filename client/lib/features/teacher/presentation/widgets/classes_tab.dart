@@ -241,30 +241,29 @@ class _ClassesTabState extends State<ClassesTab> {
                           color: Colors.white,
                         ),
                       ),
-                      // Subject (resolve per-class from schedule instead of teacher.subject)
-                      Obx(() {
-                        final subjectName =
-                            widget.controller.getSubjectNameForClass(
-                          schoolClass.id,
-                        );
+                      // Disciplines (from /teachers/me -> class.subjects)
+                      Builder(
+                        builder: (_) {
+                          final subs = (schoolClass.subjects as List?) ?? const [];
+                          final names = subs
+                              .map((s) => (s.name ?? '').toString())
+                              .where((n) => n.trim().isNotEmpty)
+                              .toList();
 
-                        // If schedules are still loading, show a nicer placeholder.
-                        final display = (subjectName != null &&
-                                subjectName.trim().isNotEmpty)
-                            ? subjectName
-                            : (widget.controller.isLoadingSchedule.value
-                                ? 'Se încarcă…'
-                                : 'Nespecificată');
+                          final display = names.isNotEmpty
+                              ? names.join(', ')
+                              : 'Nespecificată';
 
-                        return Text(
-                          'Materia: $display',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.blueAccent.withOpacity(0.8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        );
-                      }),
+                          return Text(
+                            'Materii: $display',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blueAccent.withOpacity(0.8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -338,7 +337,6 @@ class _ClassesTabState extends State<ClassesTab> {
           ),
           Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[400])),
         ],
-      ),
-    );
+      ));
   }
 }

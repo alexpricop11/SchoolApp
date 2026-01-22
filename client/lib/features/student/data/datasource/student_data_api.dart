@@ -112,6 +112,39 @@ class StudentDataApi {
 
   // ==================== HOMEWORK ====================
 
+  /// Returns homework visible to the current student (class + personal).
+  Future<List<HomeworkModel>> getMyHomework({bool forceRefresh = false}) async {
+    const myKey = '__my__';
+
+    if (!forceRefresh) {
+      final cached = CacheService.getCachedHomework(myKey);
+      if (cached != null && !CacheService.isCacheStale('homework_cache:$myKey')) {
+        debugPrint('>>> Using cached my-homework');
+        return cached.map((json) => HomeworkModel.fromJson(json)).toList();
+      }
+    }
+
+    try {
+      final response = await dio.get('/homework/my');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        await CacheService.cacheHomework(
+          myKey,
+          data.map((e) => Map<String, dynamic>.from(e)).toList(),
+        );
+        return data.map((json) => HomeworkModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching my homework: $e');
+      final cached = CacheService.getCachedHomework(myKey);
+      if (cached != null) {
+        return cached.map((json) => HomeworkModel.fromJson(json)).toList();
+      }
+      return [];
+    }
+  }
+
   Future<List<HomeworkModel>> getClassHomework(
     String classId, {
     bool forceRefresh = false,

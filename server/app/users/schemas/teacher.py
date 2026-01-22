@@ -1,11 +1,19 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr
 
 from app.users.schemas.user_base import UserRead
 from app.classes.schemas import ClassSlim
+
+
+class SubjectSlim(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    class Config:
+        from_attributes = True
 
 
 class TeacherBase(BaseModel):
@@ -32,6 +40,7 @@ class TeacherUpdate(TeacherCreate):
 class TeacherRead(TeacherBase):
     user: UserRead
     classes: list[ClassSlim] = []
+    subjects: List[SubjectSlim] = []
     created_at: datetime
     updated_at: datetime
 

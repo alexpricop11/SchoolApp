@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../controllers/teacher_dashboard_controller.dart';
 import '../../domain/entities/schedule_entity.dart';
+import '../pages/teacher_notifications_page.dart';
 import 'class_details_page.dart';
 
 class HomeTabFinal extends StatelessWidget {
@@ -76,6 +77,11 @@ class HomeTabFinal extends StatelessWidget {
                   ],
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
+                onPressed: () => Get.to(() => TeacherNotificationsPage(controller: controller)),
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -123,33 +129,37 @@ class HomeTabFinal extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Obx(
-        () => Row(
+        () => Column(
           children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.class_,
-                label: 'Clase',
-                value: '${controller.totalClasses}',
-                color: const Color(0xFF3B82F6),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.people,
-                label: 'Elevi',
-                value: '${controller.totalStudents}',
-                color: const Color(0xFF10B981),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.schedule,
-                label: 'Ore azi',
-                value: '${controller.lessonsToday}',
-                color: const Color(0xFFF59E0B),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    icon: Icons.class_,
+                    label: 'Clase',
+                    value: '${controller.totalClasses}',
+                    color: const Color(0xFF3B82F6),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    icon: Icons.people,
+                    label: 'Elevi',
+                    value: '${controller.totalStudents}',
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    icon: Icons.schedule,
+                    label: 'Ore azi',
+                    value: '${controller.lessonsToday}',
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

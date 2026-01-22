@@ -68,7 +68,7 @@ Future<void> initDependencies() async {
 
         // Reduce console noise for non-app endpoints/tooling
         // (health checks, docs, and openapi are often polled and can spam logs when offline)
-        const noisyPaths = ['/health', '/openapi.json', '/docs'];
+        const noisyPaths = ['/'];
         final isNoisy = noisyPaths.any((p) => path.contains(p));
 
         if (!isNoisy) {
@@ -124,7 +124,11 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<SyncQueue>(() => SyncQueue());
   sl.registerLazySingleton<SyncManager>(
-    () => SyncManager(queue: sl<SyncQueue>(), connectivity: sl<ConnectivityManager>(), dio: sl<Dio>()),
+    () => SyncManager(
+      queue: sl<SyncQueue>(),
+      connectivity: sl<ConnectivityManager>(),
+      dio: sl<Dio>(),
+    ),
   );
 
   // Start background-ish sync loop (in foreground) & connectivity monitoring.
@@ -252,7 +256,10 @@ Future<void> initDependencies() async {
   sl.registerFactory(() => TeacherDashboardController());
 
   sl.registerLazySingleton<OfflineActionHandler>(
-    () => OfflineActionHandler(connectivity: sl<ConnectivityManager>(), queue: sl<SyncQueue>()),
+    () => OfflineActionHandler(
+      connectivity: sl<ConnectivityManager>(),
+      queue: sl<SyncQueue>(),
+    ),
   );
 }
 
@@ -277,7 +284,11 @@ Future<bool> _tryRefreshToken(Dio dio) async {
       final role = await SecureStorageService.getRole();
       final userId = await SecureStorageService.getUserId();
 
-      await SecureStorageService.saveToken(newAccessToken, role ?? '', userId ?? '');
+      await SecureStorageService.saveToken(
+        newAccessToken,
+        role ?? '',
+        userId ?? '',
+      );
       if (newRefreshToken != null) {
         await SecureStorageService.saveRefreshToken(newRefreshToken);
       }
