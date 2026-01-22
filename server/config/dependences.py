@@ -57,3 +57,39 @@ def admin_required(current_user: dict = Depends(get_current_user)):
             detail="Only admin can access this resource"
         )
     return current_user
+
+
+async def director_required(current_user: dict = Depends(get_current_user)):
+    """
+    Verifies that the current user is a teacher with director privileges.
+    """
+    from config.database import get_db
+    from sqlalchemy import select
+    from app.users.models import Teacher
+    import uuid
+
+    if current_user["role"] != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only teachers can be directors"
+        )
+
+    # Check if this teacher is marked as director
+    async for session in get_db():
+        try:
+            user_id = uuid.UUID(current_user["id"])
+            result = await session.execute(
+                select(Teacher).where(Teacher.user_id == user_id)
+            )
+            teacher = result.scalar_one_or_none()
+
+            if not teacher or not teacher.is_director:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only directors can access this resource"
+                )
+
+            return current_user
+        finally:
+            break
+

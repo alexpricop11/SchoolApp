@@ -233,7 +233,8 @@ async def get_my_homework(
     service: HomeworkService = Depends(get_homework_service),
     session: AsyncSession = Depends(get_db),
 ):
-    # For students: returns class-wide + personal homework.
+    # For students: returns ONLY homework explicitly assigned to this student.
+    # Only homework with a HomeworkAssignment entry for this student will be returned.
     user_id = uuid.UUID(current_user["id"])
     result = await session.execute(select(Student).where(Student.user_id == user_id))
     student = result.scalar_one_or_none()

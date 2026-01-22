@@ -336,14 +336,28 @@ class HomeTab extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      DateFormat('dd MMM').format(h.dueDate),
-                                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.send, size: 10, color: Colors.blue),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          DateFormat('dd MMM').format(h.createdAt),
+                                          style: const TextStyle(color: Colors.blue, fontSize: 11),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      DateFormat('HH:mm').format(h.dueDate),
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.event, size: 10, color: Colors.orange),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          DateFormat('dd MMM').format(h.dueDate),
+                                          style: const TextStyle(color: Colors.orange, fontSize: 11),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 )
@@ -525,98 +539,29 @@ class _AgendaDayTimeline extends StatelessWidget {
     required this.dayKey,
   });
 
-  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
-
   @override
   Widget build(BuildContext context) {
     final schedules = controller.getScheduleForDay(dayKey);
 
-    // Homework due on selected day
-    final homeworksBySubject = <String, List<dynamic>>{};
-    for (final h in controller.homework.where((h) => _sameDay(h.dueDate, day))) {
-      homeworksBySubject.putIfAbsent(h.subjectName, () => []).add(h);
-    }
-
-    // Grades created on selected day, grouped by subject
+    // Group grades by subject for this day
     final gradesBySubject = <String, List<dynamic>>{};
     for (final g in controller.grades.where((g) => _sameDay(g.createdAt, day))) {
       gradesBySubject.putIfAbsent(g.subjectName, () => []).add(g);
     }
 
-    // Attendance on selected day, grouped by subject
-    final attendanceBySubject = <String, dynamic>{};
-    for (final a in controller.attendance.where((a) => _sameDay(a.attendanceDate, day))) {
-      // Keep last status if multiple
-      attendanceBySubject[a.subjectName] = a;
-    }
-
     final items = <Widget>[];
 
-    // Render schedule as the base (agenda style)
+    // Render schedule with grades
     for (final s in schedules) {
-      final subject = s.subjectName;
-      final hwList = (homeworksBySubject[subject] ?? []).cast<dynamic>();
-      final grList = (gradesBySubject[subject] ?? []).cast<dynamic>();
-      final att = attendanceBySubject[subject];
+      final subjectGrades = gradesBySubject[s.subjectName] ?? [];
 
-      final hwText = hwList.isNotEmpty ? 'Temă: ${hwList.first.title}' : null;
-      final gradeText = grList.isNotEmpty ? 'Notă: ${grList.last.value}' : null;
-      String? attText;
-      Color? attColor;
-      if (att != null) {
-        final status = (att.status ?? '').toString();
-        if (status == 'absent') {
-          attText = 'Absent';
-          attColor = const Color(0xFFEF4444);
-        } else {
-          attText = 'Prezent';
-          attColor = const Color(0xFF10B981);
-        }
-      }
-
-      final extraParts = <String>[];
-      if (hwText != null) extraParts.add(hwText);
-      if (gradeText != null) extraParts.add(gradeText);
-
-      items.add(_AgendaItem(
+      items.add(_AgendaItemWithGrades(
         color: const Color(0xFF3B82F6),
         icon: Icons.menu_book,
-        title: subject,
-        // Only time here; no room
-        subtitle: '${s.startTime} - ${s.endTime}${extraParts.isNotEmpty ? "\n${extraParts.join(' • ')}" : ''}',
-        trailing: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text('Ora ${s.periodNumber}', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-            if (attText != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: attColor!.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: attColor.withOpacity(0.35)),
-                  ),
-                  child: Text(attText, style: TextStyle(color: attColor, fontSize: 11, fontWeight: FontWeight.w700)),
-                ),
-              ),
-          ],
-        ),
-      ));
-    }
-
-    // Also show homework that doesn't match a schedule subject that day (optional)
-    final scheduledSubjects = schedules.map((s) => s.subjectName).toSet();
-    final orphanHomework = controller.homework.where((h) => _sameDay(h.dueDate, day) && !scheduledSubjects.contains(h.subjectName)).toList();
-    for (final hw in orphanHomework) {
-      items.add(_AgendaItem(
-        color: const Color(0xFFF59E0B),
-        icon: Icons.assignment,
-        title: hw.subjectName,
-        subtitle: 'Temă: ${hw.title}',
-        trailing: Text(DateFormat('HH:mm').format(hw.dueDate), style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+        title: s.subjectName,
+        subtitle: '${s.startTime} - ${s.endTime}',
+        periodNumber: s.periodNumber,
+        grades: subjectGrades,
       ));
     }
 
@@ -634,7 +579,7 @@ class _AgendaDayTimeline extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Nimic planificat pentru ziua asta.',
+                'Nu ai ore în orar pentru această zi.',
                 style: TextStyle(color: Colors.grey[400]),
               ),
             ),
@@ -652,6 +597,8 @@ class _AgendaDayTimeline extends StatelessWidget {
           .toList(),
     );
   }
+
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 class _AgendaItem extends StatelessWidget {
@@ -706,3 +653,190 @@ class _AgendaItem extends StatelessWidget {
     );
   }
 }
+
+class _AgendaItemWithGrades extends StatefulWidget {
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final int periodNumber;
+  final List<dynamic> grades;
+
+  const _AgendaItemWithGrades({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.periodNumber,
+    required this.grades,
+  });
+
+  @override
+  State<_AgendaItemWithGrades> createState() => _AgendaItemWithGradesState();
+}
+
+class _AgendaItemWithGradesState extends State<_AgendaItemWithGrades> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasGrades = widget.grades.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1419),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: hasGrades ? () => setState(() => _isExpanded = !_isExpanded) : null,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: widget.color.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(widget.icon, color: widget.color, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                widget.title,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (hasGrades)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.star, color: Colors.green, size: 12),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${widget.grades.length}',
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(widget.subtitle, style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('Ora ${widget.periodNumber}', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                      if (hasGrades)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Icon(
+                            _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            color: Colors.grey[500],
+                            size: 20,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isExpanded && hasGrades)
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Column(
+                children: [
+                  const Divider(color: Colors.white10, height: 1),
+                  const SizedBox(height: 12),
+                  ...widget.grades.map((grade) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${grade.value}',
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                grade.type.name.toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.grey[300],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (grade.description != null && grade.description!.isNotEmpty)
+                                Text(
+                                  grade.description!,
+                                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          DateFormat('HH:mm').format(grade.createdAt),
+                          style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+

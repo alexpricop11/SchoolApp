@@ -12,9 +12,15 @@ class HomeworkModel extends Homework {
     required super.classId,
     required super.teacherId,
     required super.createdAt,
+    super.assignedStudentIds,
+    super.isPersonal,
   });
 
   factory HomeworkModel.fromJson(Map<String, dynamic> json) {
+    final assignedIds = (json['assigned_student_ids'] as List<dynamic>?)
+        ?.map((e) => e.toString())
+        .toList() ?? [];
+
     return HomeworkModel(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
@@ -26,6 +32,8 @@ class HomeworkModel extends Homework {
       classId: json['class_id'] ?? '',
       teacherId: json['teacher_id'] ?? '',
       createdAt: DateTime.parse(json['created_at']),
+      assignedStudentIds: assignedIds,
+      isPersonal: json['is_personal'] ?? false,
     );
   }
 

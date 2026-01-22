@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
 import '../network/dio_client.dart';
 import 'secure_storage_service.dart';
+import 'cache_service.dart';
 
 /// Service for handling authentication operations
 class AuthService {
@@ -24,6 +25,9 @@ class AuthService {
 
     // Clear local storage
     await SecureStorageService.clearAll();
+
+    // Clear cached user data
+    await CacheService.clearUserCache();
 
     // Reset Dio instance to clear any cached tokens
     DioClient.reset();

@@ -59,19 +59,12 @@ class _HomeworkPageState extends State<HomeworkPage> {
     }
   }
 
-  String _formatDueDate(DateTime dueDate) {
-    final now = DateTime.now();
-    final difference = dueDate.difference(now);
+  String _formatCreatedDate(DateTime createdAt) {
+    return 'Trimis: ${DateFormat('dd MMM yyyy').format(createdAt)}';
+  }
 
-    if (difference.isNegative) {
-      return 'Expirat ${DateFormat('dd MMM yyyy').format(dueDate)}';
-    } else if (difference.inDays == 0) {
-      return 'Azi până la ${DateFormat('HH:mm').format(dueDate)}';
-    } else if (difference.inDays == 1) {
-      return 'Mâine până la ${DateFormat('HH:mm').format(dueDate)}';
-    } else {
-      return 'Termen: ${DateFormat('dd MMM yyyy').format(dueDate)}';
-    }
+  String _formatDueDate(DateTime dueDate) {
+    return 'Termen: ${DateFormat('dd MMM yyyy').format(dueDate)}';
   }
 
   @override
@@ -190,15 +183,33 @@ class _HomeworkPageState extends State<HomeworkPage> {
                                     Row(
                                       children: [
                                         Icon(
+                                          Icons.send,
+                                          size: 16,
+                                          color: Colors.blue,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _formatCreatedDate(homework.createdAt),
+                                          style: const TextStyle(
+                                            color: Colors.blue,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Icon(
                                           Icons.calendar_today,
                                           size: 16,
-                                          color: Colors.white60,
+                                          color: Colors.orange,
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
                                           _formatDueDate(homework.dueDate),
                                           style: const TextStyle(
-                                            color: Colors.white60,
+                                            color: Colors.orange,
                                             fontSize: 13,
                                           ),
                                         ),

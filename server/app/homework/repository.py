@@ -52,7 +52,9 @@ class HomeworkRepository:
         return list(result.unique().scalars().all())
 
     async def get_for_student(self, student_id: uuid.UUID, class_id: Optional[uuid.UUID]) -> List[Homework]:
-        # Only personal homework explicitly assigned to the student.
+        # Returns ONLY homework explicitly assigned to this specific student.
+        # This filters by HomeworkAssignment records, so only homework created
+        # with this student's ID in the student_ids list will be returned.
         stmt = (
             select(Homework)
             .options(joinedload(Homework.subject), joinedload(Homework.assignments))

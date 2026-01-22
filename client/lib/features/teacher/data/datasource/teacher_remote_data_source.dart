@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../../../core/network/auth_options.dart';
+import '../../../../core/services/cache_service.dart';
 import '../model/teacher_model.dart';
 
 abstract class TeacherRemoteDataSource {
@@ -17,11 +18,28 @@ class TeacherRemoteDataSourceImpl implements TeacherRemoteDataSource {
 
   @override
   Future<TeacherModel> getCurrentTeacher(String token) async {
-    final response = await dio.get(
-      '/teachers/me',
-      options: AuthOptions.bearer(token), // Token trimis în header
-    );
-    return TeacherModel.fromJson(response.data);
+    try {
+      final response = await dio.get(
+        '/teachers/me',
+        options: AuthOptions.bearer(token),
+      );
+
+      // Cache the teacher data for offline access
+      await CacheService.cacheUser(response.data as Map<String, dynamic>);
+
+      return TeacherModel.fromJson(response.data);
+    } catch (e) {
+      print("⚠️ Teacher load error: $e");
+
+      // If server is unavailable, try to return cached teacher data
+      final cachedData = CacheService.getCachedUser();
+      if (cachedData != null) {
+        print("📦 Server unavailable - returning cached teacher: ${cachedData['username']}");
+        return TeacherModel.fromJson(cachedData);
+      }
+
+      rethrow;
+    }
   }
 
   @override

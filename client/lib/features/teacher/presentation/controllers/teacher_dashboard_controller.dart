@@ -43,6 +43,8 @@ class TeacherDashboardController extends GetxController {
   final teacher = Rxn<Teacher>();
   final classes = <SchoolClass>[].obs;
   final allStudents = <StudentModel>[].obs;
+  final allTeachers = <TeacherModel>[].obs; // For director
+  final isLoadingTeachers = false.obs; // For director
 
   // Grades
   final grades = <Grade>[].obs;
@@ -406,10 +408,16 @@ class TeacherDashboardController extends GetxController {
         attendanceData['teacher_id'] = teacher.value!.id;
       }
 
-      // Normalize date to ISO date (YYYY-MM-DD)
+      // Normalize date to ISO date (YYYY-MM-DD only, not datetime)
       if (attendanceData['attendance_date'] is DateTime) {
         final dt = attendanceData['attendance_date'] as DateTime;
-        attendanceData['attendance_date'] = dt.toIso8601String();
+        attendanceData['attendance_date'] = dt.toIso8601String().split('T')[0];
+      } else if (attendanceData['attendance_date'] is String) {
+        // If already string, ensure it's just the date part
+        final dateStr = attendanceData['attendance_date'] as String;
+        if (dateStr.contains('T')) {
+          attendanceData['attendance_date'] = dateStr.split('T')[0];
+        }
       }
 
       final res = await offlineHandler.run(
@@ -823,7 +831,7 @@ class TeacherDashboardController extends GetxController {
     String? notes,
   }) async {
     await createAttendance({
-      'attendance_date': date.toIso8601String(),
+      'attendance_date': date.toIso8601String().split('T')[0], // Fix: Send only date part
       'status': status,
       'notes': notes,
       'student_id': studentId,
@@ -890,6 +898,138 @@ class TeacherDashboardController extends GetxController {
       print('🔍 [TeacherDashboard] fetchMySubjectsForClass error: $e');
       print('🔍 [TeacherDashboard] stack: $st');
       return [];
+    }
+  }
+
+  // ==================== DIRECTOR FUNCTIONS ====================
+
+  Future<void> broadcastAnnouncement({
+    required String title,
+    required String message,
+    List<String>? targetRoles,
+  }) async {
+    try {
+      final token = await SecureStorageService.getToken();
+      if (token == null) throw Exception('No token');
+
+      final dio = await DioClient.getInstance();
+
+      final queryParams = <String, dynamic>{
+        'title': title,
+        'message': message,
+      };
+
+      if (targetRoles != null && targetRoles.isNotEmpty) {
+        queryParams['target_roles'] = targetRoles;
+      }
+
+      await dio.post(
+        '/notifications/broadcast',
+        queryParameters: queryParams,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      print('✅ [Director] Broadcast announcement sent successfully');
+    } catch (e) {
+      print('❌ [Director] Broadcast announcement error: $e');
+      throw Exception('Failed to broadcast announcement: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchHomeroomClassReport() async {
+    try {
+      final token = await SecureStorageService.getToken();
+      if (token == null) throw Exception('No token');
+
+      final dio = await DioClient.getInstance();
+      final response = await dio.get(
+        '/reports/homeroom-class',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      print('❌ [Homeroom] Fetch report error: $e');
+      throw Exception('Failed to fetch homeroom report: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchSchoolOverviewReport() async {
+    try {
+      final token = await SecureStorageService.getToken();
+      if (token == null) throw Exception('No token');
+
+      final dio = await DioClient.getInstance();
+      final response = await dio.get(
+        '/reports/school-overview',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      print('❌ [Director] Fetch school overview error: $e');
+      throw Exception('Failed to fetch school overview: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchTeacherPerformanceReport() async {
+    try {
+      final token = await SecureStorageService.getToken();
+      if (token == null) throw Exception('No token');
+
+      final dio = await DioClient.getInstance();
+      final response = await dio.get(
+        '/reports/teacher-performance',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      print('❌ [Director] Fetch teacher performance error: $e');
+      throw Exception('Failed to fetch teacher performance: $e');
+    }
+  }
+
+  // ==================== DIRECTOR - TEACHERS MANAGEMENT ====================
+  Future<void> fetchAllTeachers() async {
+    isLoadingTeachers.value = true;
+    try {
+      final token = await SecureStorageService.getToken();
+      if (token == null) return;
+
+      final dio = await DioClient.getInstance();
+      final response = await dio.get(
+        '/teachers/',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.data != null) {
+        final List<dynamic> data = response.data as List<dynamic>;
+        allTeachers.value = data
+            .map((json) => TeacherModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+        print('✅ [Director] Loaded ${allTeachers.length} teachers');
+      }
+    } catch (e) {
+      print('❌ [Director] Fetch all teachers error: $e');
+      Get.snackbar(
+        'Eroare',
+        'Nu s-au putut încărca profesorii',
+        backgroundColor: Colors.red.withOpacity(0.2),
+        colorText: Colors.white,
+      );
+    } finally {
+      isLoadingTeachers.value = false;
     }
   }
 }

@@ -41,6 +41,21 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _loadAttendanceForDate();
+  }
+
+  // Load attendance for all students on selected date
+  void _loadAttendanceForDate() async {
+    final studentIds = widget.schoolClass.students
+        .map((s) => s.userId)
+        .whereType<String>()
+        .toList();
+
+    for (final sid in studentIds) {
+      await widget.controller.fetchStudentAttendance(sid);
+    }
+
+    if (mounted) setState(() {});
   }
 
   // Helper: Select all filtered students
@@ -143,6 +158,8 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      // Reload attendance for new date
+      _loadAttendanceForDate();
     }
   }
 
@@ -498,51 +515,101 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
   }
 
   Widget _buildClassHomeworkView() {
-    return FutureBuilder<void>(
-      future: widget.controller.fetchClassHomework(widget.schoolClass.id),
-      builder: (context, snapshot) {
-        final items = widget.controller.homeworkList;
-        if (snapshot.connectionState == ConnectionState.waiting && items.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Stack(
+      children: [
+        FutureBuilder<void>(
+          future: widget.controller.fetchClassHomework(widget.schoolClass.id),
+          builder: (context, snapshot) {
+            final items = widget.controller.homeworkList;
+            if (snapshot.connectionState == ConnectionState.waiting && items.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (items.isEmpty) {
-          return Center(child: Text('Nu există teme pentru această clasă', style: TextStyle(color: Colors.grey[400])));
-        }
+            if (items.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.assignment_outlined, size: 64, color: Colors.grey[600]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Nu există teme pentru această clasă',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Apasă butonul + pentru a adăuga',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                  ],
+                ),
+              );
+            }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final h = items[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1F26),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(h.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Text(h.description ?? '', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Row(
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final h = items[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1F26),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.calendar_today, color: Colors.grey[500], size: 14),
-                      const SizedBox(width: 6),
-                      Text(DateFormat('dd MMM yyyy', 'ro').format(h.dueDate), style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                      Text(h.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text(h.description ?? '', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: Colors.grey[500], size: 14),
+                          const SizedBox(width: 6),
+                          Text(DateFormat('dd MMM yyyy', 'ro').format(h.dueDate), style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                          const Spacer(),
+                          if (h.assignedStudentIds.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.person, color: Colors.blue, size: 12),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${h.assignedStudentIds.length} elev${h.assignedStudentIds.length != 1 ? 'i' : ''}',
+                                    style: const TextStyle(color: Colors.blue, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      )
                     ],
-                  )
-                ],
-              ),
+                  ),
+                );
+              },
             );
           },
-        );
-      },
+        ),
+        // Floating Action Button pentru adăugare temă
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            onPressed: () => _showClassHomeworkDialog(),
+            backgroundColor: Colors.blueAccent,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 
@@ -692,6 +759,189 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             child: const Text('Trimite', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClassHomeworkDialog() {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1A1F26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.class_, color: Colors.blue, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Temă pentru întreaga clasă',
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                  Text(
+                    widget.schoolClass.name,
+                    style: TextStyle(color: Colors.grey[400], fontSize: 14, fontWeight: FontWeight.normal),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Info box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Această temă va fi trimisă tuturor celor ${widget.schoolClass.students.length} elevi din clasă',
+                        style: const TextStyle(color: Colors.blue, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Titlu temă',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: const Color(0xFF0F1419),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  prefixIcon: const Icon(Icons.title, color: Colors.grey),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descriptionController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Descriere (ex: Rezolvați exercițiile 1-10 din manual)',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: const Color(0xFF0F1419),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  prefixIcon: const Icon(Icons.description, color: Colors.grey),
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Date picker
+              InkWell(
+                onTap: _selectDate,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1419),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Termen limită: ${DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate)}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Anulează', style: TextStyle(color: Colors.grey[400])),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleController.text.trim().isEmpty) {
+                Get.snackbar('Eroare', 'Te rog introdu un titlu pentru temă');
+                return;
+              }
+
+              final subjectId = await _getSubjectId();
+              if (subjectId == null) return;
+
+              // Get all student IDs from the class
+              final studentIds = widget.schoolClass.students
+                  .map((s) => s.userId)
+                  .whereType<String>()
+                  .where((id) => id.isNotEmpty)
+                  .toList();
+
+              if (studentIds.isEmpty) {
+                Get.snackbar('Eroare', 'Nu există elevi în această clasă');
+                return;
+              }
+
+              await widget.controller.createHomeworkForStudents(
+                studentIds: studentIds,
+                classId: widget.schoolClass.id,
+                subjectId: subjectId,
+                title: titleController.text,
+                description: descriptionController.text,
+                dueDate: _selectedDate,
+              );
+
+              Get.back();
+
+              // Refresh homework list
+              setState(() {});
+
+              Get.snackbar(
+                'Succes',
+                'Tema a fost trimisă la ${studentIds.length} elev${studentIds.length != 1 ? 'i' : ''}',
+                backgroundColor: Colors.green.withOpacity(0.2),
+                colorText: Colors.white,
+                icon: const Icon(Icons.check_circle, color: Colors.green),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.send, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Trimite tema', style: TextStyle(color: Colors.white)),
+              ],
+            ),
           ),
         ],
       ),
@@ -1052,49 +1302,136 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
               DateFormat('dd MMMM yyyy', 'ro').format(_selectedDate),
               style: TextStyle(color: Colors.grey[400]),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Selectează status (default: Prezent)',
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            ),
             const SizedBox(height: 20),
+            // First row: Present and Absent
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildAttendanceOption(
-                  'Prezent',
-                  Colors.green,
-                  Icons.check_circle,
-                  () async {
-                    final subjectId = await _getSubjectId();
-                    if (subjectId == null) return;
+                Expanded(
+                  child: _buildAttendanceOption(
+                    'Prezent',
+                    Colors.green,
+                    Icons.check_circle,
+                    isDefault: true, // Highlighted as default
+                    onTap: () async {
+                      Get.back(); // Close immediately
+                      final subjectId = await _getSubjectId();
+                      if (subjectId == null) return;
 
-                    final sid = student.userId;
-                    if (sid == null || sid.isEmpty) return;
-                    await widget.controller.markAttendanceForStudent(
-                      studentId: sid,
-                      subjectId: subjectId,
-                      date: _selectedDate,
-                      status: 'present',
-                      notes: null,
-                    );
-                    Get.back();
-                  },
+                      final sid = student.userId;
+                      if (sid == null || sid.isEmpty) return;
+
+                      await widget.controller.markAttendanceForStudent(
+                        studentId: sid,
+                        subjectId: subjectId,
+                        date: _selectedDate,
+                        status: 'present',
+                        notes: null,
+                      );
+
+                      // Reload attendance and refresh UI
+                      await widget.controller.fetchStudentAttendance(sid);
+                      if (mounted) setState(() {});
+                    },
+                  ),
                 ),
-                _buildAttendanceOption(
-                  'Absent',
-                  Colors.red,
-                  Icons.cancel,
-                  () async {
-                    final subjectId = await _getSubjectId();
-                    if (subjectId == null) return;
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAttendanceOption(
+                    'Absent',
+                    Colors.red,
+                    Icons.cancel,
+                    isDefault: false,
+                    onTap: () async {
+                      Get.back(); // Close immediately
+                      final subjectId = await _getSubjectId();
+                      if (subjectId == null) return;
 
-                    final sid2 = student.userId;
-                    if (sid2 == null || sid2.isEmpty) return;
-                    await widget.controller.markAttendanceForStudent(
-                      studentId: sid2,
-                      subjectId: subjectId,
-                      date: _selectedDate,
-                      status: 'absent',
-                      notes: null,
-                    );
-                    Get.back();
-                  },
+                      final sid = student.userId;
+                      if (sid == null || sid.isEmpty) return;
+
+                      await widget.controller.markAttendanceForStudent(
+                        studentId: sid,
+                        subjectId: subjectId,
+                        date: _selectedDate,
+                        status: 'absent',
+                        notes: null,
+                      );
+
+                      // Reload attendance and refresh UI
+                      await widget.controller.fetchStudentAttendance(sid);
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Second row: Late and Excused
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: _buildAttendanceOption(
+                    'Întârziat',
+                    Colors.orange,
+                    Icons.schedule,
+                    isDefault: false,
+                    onTap: () async {
+                      Get.back(); // Close immediately
+                      final subjectId = await _getSubjectId();
+                      if (subjectId == null) return;
+
+                      final sid = student.userId;
+                      if (sid == null || sid.isEmpty) return;
+
+                      await widget.controller.markAttendanceForStudent(
+                        studentId: sid,
+                        subjectId: subjectId,
+                        date: _selectedDate,
+                        status: 'late',
+                        notes: null,
+                      );
+
+                      // Reload attendance and refresh UI
+                      await widget.controller.fetchStudentAttendance(sid);
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildAttendanceOption(
+                    'Motivat',
+                    Colors.blue,
+                    Icons.event_available,
+                    isDefault: false,
+                    onTap: () async {
+                      Get.back(); // Close immediately
+                      final subjectId = await _getSubjectId();
+                      if (subjectId == null) return;
+
+                      final sid = student.userId;
+                      if (sid == null || sid.isEmpty) return;
+
+                      await widget.controller.markAttendanceForStudent(
+                        studentId: sid,
+                        subjectId: subjectId,
+                        date: _selectedDate,
+                        status: 'excused',
+                        notes: null,
+                      );
+
+                      // Reload attendance and refresh UI
+                      await widget.controller.fetchStudentAttendance(sid);
+                      if (mounted) setState(() {});
+                    },
+                  ),
                 ),
               ],
             ),
@@ -1104,26 +1441,56 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
     );
   }
 
-  Widget _buildAttendanceOption(String label, Color color, IconData icon, VoidCallback onTap) {
+  Widget _buildAttendanceOption(
+    String label,
+    Color color,
+    IconData icon,
+    {bool isDefault = false,
+    required VoidCallback onTap}
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
+            color: isDefault ? color.withOpacity(0.25) : color.withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
+            border: isDefault ? Border.all(color: color, width: 2) : null,
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: color, size: 28),
+              Icon(icon, color: color, size: isDefault ? 32 : 28),
               const SizedBox(height: 6),
               Text(
                 label,
-                style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: color,
+                  fontSize: isDefault ? 14 : 13,
+                  fontWeight: isDefault ? FontWeight.bold : FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
               ),
+              if (isDefault)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Default',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -1141,6 +1508,167 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
       onAddGrade: () => _showAddGradeDialog(student),
       onAddAbsence: () => _showQuickAttendanceDialog(student),
     ));
+  }
+
+  Widget _buildAttendanceStatusAvatar(StudentModel student) {
+    // Find attendance for this student on selected date
+    final studentId = student.userId;
+    if (studentId == null || studentId.isEmpty) {
+      // No student ID - show default avatar
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: Colors.blueAccent.withOpacity(0.2),
+        child: Text(
+          student.username.isNotEmpty ? student.username[0].toUpperCase() : '?',
+          style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    // Search for attendance matching student and date
+    Attendance? attendanceForStudent;
+    try {
+      attendanceForStudent = widget.controller.attendanceList.firstWhereOrNull(
+        (a) =>
+          a.studentId == studentId &&
+          a.attendanceDate.year == _selectedDate.year &&
+          a.attendanceDate.month == _selectedDate.month &&
+          a.attendanceDate.day == _selectedDate.day,
+      );
+    } catch (e) {
+      print('Error finding attendance: $e');
+    }
+
+    // Determine color and icon based on status (with defaults)
+    Color statusColor = Colors.grey;
+    IconData statusIcon = Icons.help_outline;
+
+    if (attendanceForStudent != null) {
+      switch (attendanceForStudent.status) {
+        case AttendanceStatus.present:
+          statusColor = const Color(0xFF4CAF50); // Green
+          statusIcon = Icons.check_circle;
+          break;
+        case AttendanceStatus.absent:
+          statusColor = const Color(0xFFEF4444); // Red
+          statusIcon = Icons.cancel;
+          break;
+        case AttendanceStatus.late:
+          statusColor = const Color(0xFFFF9800); // Orange
+          statusIcon = Icons.schedule;
+          break;
+        case AttendanceStatus.excused:
+          statusColor = const Color(0xFF2196F3); // Blue
+          statusIcon = Icons.event_available;
+          break;
+      }
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: Colors.blueAccent.withOpacity(0.2),
+          child: Text(
+            student.username.isNotEmpty ? student.username[0].toUpperCase() : '?',
+            style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
+          ),
+        ),
+        // Status indicator badge
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF0F1419),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                statusIcon,
+                color: Colors.white,
+                size: 10,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAttendanceButton(StudentModel student) {
+    // Find attendance for this student on selected date
+    final studentId = student.userId;
+    if (studentId == null || studentId.isEmpty) {
+      // No student ID - show default red button
+      return IconButton(
+        icon: const Icon(Icons.event_busy, color: Colors.red, size: 22),
+        onPressed: () => _showQuickAttendanceDialog(student),
+        tooltip: 'Prezență',
+      );
+    }
+
+    // Search for attendance matching student and date
+    Attendance? attendanceForStudent;
+    try {
+      attendanceForStudent = widget.controller.attendanceList.firstWhereOrNull(
+        (a) =>
+          a.studentId == studentId &&
+          a.attendanceDate.year == _selectedDate.year &&
+          a.attendanceDate.month == _selectedDate.month &&
+          a.attendanceDate.day == _selectedDate.day,
+      );
+    } catch (e) {
+      print('Error finding attendance for button: $e');
+    }
+
+    // Determine color, icon, and tooltip based on status
+    Color buttonColor;
+    IconData buttonIcon;
+    String buttonTooltip;
+
+    if (attendanceForStudent == null) {
+      // No attendance marked - show default (red with question)
+      buttonColor = Colors.grey;
+      buttonIcon = Icons.help_outline;
+      buttonTooltip = 'Prezență (Nemarcat)';
+    } else {
+      switch (attendanceForStudent.status) {
+        case AttendanceStatus.present:
+          buttonColor = const Color(0xFF4CAF50); // Green
+          buttonIcon = Icons.check_circle;
+          buttonTooltip = 'Prezent';
+          break;
+        case AttendanceStatus.absent:
+          buttonColor = const Color(0xFFEF4444); // Red
+          buttonIcon = Icons.cancel;
+          buttonTooltip = 'Absent';
+          break;
+        case AttendanceStatus.late:
+          buttonColor = const Color(0xFFFF9800); // Orange
+          buttonIcon = Icons.schedule;
+          buttonTooltip = 'Întârziat';
+          break;
+        case AttendanceStatus.excused:
+          buttonColor = const Color(0xFF2196F3); // Blue
+          buttonIcon = Icons.event_available;
+          buttonTooltip = 'Motivat';
+          break;
+      }
+    }
+
+    return IconButton(
+      icon: Icon(buttonIcon, color: buttonColor, size: 22),
+      onPressed: () => _showQuickAttendanceDialog(student),
+      tooltip: buttonTooltip,
+    );
   }
 
   // ---------- Missing UI helpers (restored) ----------
@@ -1397,14 +1925,7 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                     activeColor: Colors.blueAccent,
                   )
                 else
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.blueAccent.withOpacity(0.2),
-                    child: Text(
-                      student.username.isNotEmpty ? student.username[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                  _buildAttendanceStatusAvatar(student),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -1418,11 +1939,7 @@ class _StudentsCatalogState extends State<StudentsCatalog> {
                     onPressed: () => _showAddGradeDialog(student),
                     tooltip: 'Notă',
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.event_busy, color: Colors.red, size: 22),
-                    onPressed: () => _showQuickAttendanceDialog(student),
-                    tooltip: 'Absență',
-                  ),
+                  _buildAttendanceButton(student),
                   IconButton(
                     icon: const Icon(Icons.assignment, color: Colors.blue, size: 22),
                     onPressed: () => _showHomeworkDialog(student),

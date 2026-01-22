@@ -12,6 +12,7 @@ class CacheService {
   static const String _studentBox = 'student_cache';
   static const String _materialsBox = 'materials_cache';
   static const String _metadataBox = 'cache_metadata';
+  static const String _userBox = 'user_cache';
 
   static bool _initialized = false;
 
@@ -30,6 +31,7 @@ class CacheService {
       Hive.openBox<dynamic>(_studentBox),
       Hive.openBox<dynamic>(_materialsBox),
       Hive.openBox<dynamic>(_metadataBox),
+      Hive.openBox<dynamic>(_userBox),
     ]);
 
     _initialized = true;
@@ -160,6 +162,29 @@ class CacheService {
     return Map<String, dynamic>.from(data);
   }
 
+  // ==================== USER ====================
+
+  static Future<void> cacheUser(Map<String, dynamic> user) async {
+    final box = Hive.box<dynamic>(_userBox);
+    await box.put('current_user', user);
+    await _updateTimestamp(_userBox);
+    debugPrint('✅ User cached: ${user['username']}');
+  }
+
+  static Map<String, dynamic>? getCachedUser() {
+    if (!Hive.isBoxOpen(_userBox)) return null;
+    final box = Hive.box<dynamic>(_userBox);
+    final data = box.get('current_user');
+    if (data == null) return null;
+    return Map<String, dynamic>.from(data);
+  }
+
+  static Future<void> clearUserCache() async {
+    final box = Hive.box<dynamic>(_userBox);
+    await box.clear();
+    debugPrint('🗑️ User cache cleared');
+  }
+
   // ==================== CACHE MANAGEMENT ====================
 
   /// Check if cache is stale (older than maxAge)
@@ -197,6 +222,7 @@ class CacheService {
       Hive.box<dynamic>(_studentBox).clear(),
       Hive.box<dynamic>(_materialsBox).clear(),
       Hive.box<dynamic>(_metadataBox).clear(),
+      Hive.box<dynamic>(_userBox).clear(),
     ]);
     debugPrint('All cache cleared');
   }

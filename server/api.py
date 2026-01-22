@@ -13,6 +13,7 @@ from app.homework.routes import router as homework_router
 from app.material.routes import router as material_router
 from app.notification.routes import router as notification_router
 from app.password.routes import router as password_router
+from app.reports.routes import router as reports_router
 from app.schedule.routes import router as schedule_router
 from app.school.routes import router as school_router
 from app.subject.routes import router as subject_router
@@ -57,6 +58,7 @@ app.include_router(homework_router)
 app.include_router(attendance_router)
 app.include_router(notification_router)
 app.include_router(material_router)
+app.include_router(reports_router)
 
 # WebSocket Routes
 app.include_router(websocket_router)

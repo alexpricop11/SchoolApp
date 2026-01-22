@@ -8,6 +8,7 @@ class HomeworkModel {
   final String subjectName;
   final String teacherId;
   final String classId;
+  final DateTime createdAt;
 
   HomeworkModel({
     required this.id,
@@ -19,6 +20,7 @@ class HomeworkModel {
     required this.subjectName,
     required this.teacherId,
     required this.classId,
+    required this.createdAt,
   });
 
   factory HomeworkModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class HomeworkModel {
       subjectName: json['subject']?['name'] ?? 'Unknown',
       teacherId: json['teacher_id'] ?? '',
       classId: json['class_id'] ?? '',
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 }

@@ -17,6 +17,8 @@ class Homework extends Equatable {
   final String classId;
   final String teacherId;
   final DateTime createdAt;
+  final List<String> assignedStudentIds;
+  final bool isPersonal;
 
   const Homework({
     required this.id,
@@ -29,6 +31,8 @@ class Homework extends Equatable {
     required this.classId,
     required this.teacherId,
     required this.createdAt,
+    this.assignedStudentIds = const [],
+    this.isPersonal = false,
   });
 
   @override
@@ -43,5 +47,7 @@ class Homework extends Equatable {
         classId,
         teacherId,
         createdAt,
+        assignedStudentIds,
+        isPersonal,
       ];
 }

@@ -17,7 +17,14 @@ class AttendanceRepository:
         self.session.add(attendance)
         await self.session.commit()
         await self.session.refresh(attendance)
-        return attendance
+
+        # Load the subject relationship to avoid lazy loading issues in response serialization
+        result = await self.session.execute(
+            select(Attendance)
+            .options(joinedload(Attendance.subject))
+            .where(Attendance.id == attendance.id)
+        )
+        return result.scalar_one()
 
     async def get_by_id(self, attendance_id: uuid.UUID) -> Optional[Attendance]:
         result = await self.session.execute(

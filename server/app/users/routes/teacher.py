@@ -17,7 +17,7 @@ from app.users.repositories.user import UserRepository
 from app.users.schemas.teacher import TeacherRead, TeacherCreate, TeacherUpdate
 from app.users.services.teacher import TeacherService
 from config.database import AsyncSession, get_db
-from config.dependences import admin_required, get_current_user
+from config.dependences import admin_required, get_current_user, director_required
 
 router = APIRouter(prefix="/teachers", tags=["Teachers"])
 
@@ -28,7 +28,22 @@ async def get_teacher_service(session: AsyncSession = Depends(get_db)) -> Teache
     return TeacherService(repository=teacher_repository, user_repository=user_repository)
 
 
-@router.get("/", response_model=List[TeacherRead], dependencies=[Depends(admin_required)])
+async def admin_or_director_required(current_user: dict = Depends(get_current_user)):
+    """Allow both admin and director to access"""
+    if current_user["role"] == "admin":
+        return current_user
+
+    # Check if teacher is director
+    try:
+        return await director_required(current_user)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin or director can access this resource"
+        )
+
+
+@router.get("/", response_model=List[TeacherRead], dependencies=[Depends(admin_or_director_required)])
 async def get_all_teachers(skip: int = 0, limit: int = 100, q: Optional[str] = None, service: TeacherService = Depends(get_teacher_service)):
     return await service.get_all_teachers(skip=skip, limit=limit, q=q)
 
@@ -60,6 +75,93 @@ async def get_current_teacher(
 
     await session.refresh(teacher, attribute_names=["user"])
 
+    # SPECIAL CASE: If director, load ALL classes from their school
+    if teacher.is_director:
+        # Get director's school_id from their user
+        school_id = teacher.user.school_id if teacher.user else None
+
+        if school_id:
+            # Load all classes from the school with students and teachers
+            classes_query = select(Class).where(Class.school_id == school_id).options(
+                selectinload(Class.students).selectinload(Student.user),
+                selectinload(Class.teacher).selectinload(Teacher.user)  # Homeroom teacher with user
+            )
+            result = await session.execute(classes_query)
+            classes = list(result.scalars().all())
+
+            # For director, we still need subjects they can view (all subjects from school)
+            # Get all subjects from schedules in this school
+            all_schedules_query = select(Schedule).where(
+                Schedule.class_id.in_([c.id for c in classes])
+            ).options(selectinload(Schedule.subject))
+
+            all_schedules_result = await session.execute(all_schedules_query)
+            all_schedules = list(all_schedules_result.scalars().all())
+
+            subjects_map = {}
+            for sch in all_schedules:
+                subj = getattr(sch, 'subject', None)
+                if subj is None:
+                    continue
+                subjects_map[str(subj.id)] = {'id': str(subj.id), 'name': subj.name}
+
+            # Build serialized classes with all subjects
+            serialized_classes = []
+            for c in classes:
+                # Get homeroom teacher info
+                homeroom_teacher = getattr(c, 'teacher', None)
+                homeroom_teacher_id = str(homeroom_teacher.user_id) if homeroom_teacher else None
+                homeroom_teacher_name = homeroom_teacher.user.username if (homeroom_teacher and homeroom_teacher.user) else None
+
+                # Get all subjects for this class from schedules
+                class_subjects_map = {}
+                for sch in all_schedules:
+                    if str(sch.class_id) == str(c.id):
+                        subj = getattr(sch, 'subject', None)
+                        if subj:
+                            class_subjects_map[str(subj.id)] = {'id': str(subj.id), 'name': subj.name}
+
+                serialized = {
+                    'id': str(c.id),
+                    'name': c.name,
+                    'school_id': str(c.school_id),
+                    'teacher_id': homeroom_teacher_id,
+                    'homeroom_teacher': homeroom_teacher_name,
+                    'subjects': list(class_subjects_map.values()),
+                    'students': [
+                        {
+                            'user_id': str(s.user_id),
+                            'class_id': str(s.class_id),
+                            'user': {
+                                'username': s.user.username if s.user else None,
+                                'email': s.user.email if s.user else None,
+                            } if s.user else None
+                        } for s in c.students
+                    ]
+                }
+                serialized_classes.append(serialized)
+
+            return {
+                'user_id': str(teacher.user_id),
+                'user': {
+                    'id': str(teacher.user.id),
+                    'username': teacher.user.username,
+                    'email': teacher.user.email,
+                    'role': teacher.user.role,
+                    'is_activated': teacher.user.is_activated,
+                    'avatar_url': teacher.user.avatar_url,
+                    'created_at': teacher.user.created_at.isoformat() if teacher.user.created_at else None,
+                    'updated_at': teacher.user.updated_at.isoformat() if teacher.user.updated_at else None,
+                },
+                'subject': teacher.subject,
+                'is_homeroom': teacher.is_homeroom,
+                'is_director': teacher.is_director,
+                'created_at': teacher.created_at.isoformat() if teacher.created_at else None,
+                'updated_at': teacher.updated_at.isoformat() if teacher.updated_at else None,
+                'classes': serialized_classes,
+            }
+
+    # NORMAL CASE: Regular teacher or homeroom teacher
     # Prefer explicit teacher<->class<->subject assignments
     tcs_query = select(TeacherClassSubject).where(TeacherClassSubject.teacher_id == user_uuid).options(
         selectinload(TeacherClassSubject.subject)
